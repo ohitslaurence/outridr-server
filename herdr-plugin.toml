@@ -1,0 +1,24 @@
+id = "outridr"
+name = "outridr"
+version = "0.1.0"
+min_herdr_version = "0.7.0"
+description = "Ride flank on your coding agents — tailnet server for the outridr mobile app"
+platforms = ["linux", "macos"]
+
+[[actions]]
+id = "install"
+title = "outridr: install service"
+contexts = ["workspace"]
+command = ["node", "bin/outridr.mjs", "install"]
+
+[[actions]]
+id = "status"
+title = "outridr: service status"
+contexts = ["workspace"]
+command = ["node", "bin/outridr.mjs", "status"]
+
+[[actions]]
+id = "uninstall"
+title = "outridr: uninstall service"
+contexts = ["workspace"]
+command = ["node", "bin/outridr.mjs", "uninstall"]

@@ -1,0 +1,19 @@
+{
+  "name": "outridr",
+  "version": "0.1.0",
+  "description": "Ride flank on your coding agents — expose a herdr machine to your tailnet for the outridr mobile app",
+  "license": "MIT",
+  "repository": "github:ohitslaurence/outridr",
+  "type": "module",
+  "bin": {
+    "outridr": "./bin/outridr.mjs"
+  },
+  "files": ["bin", "lib", "herdr-plugin.toml", "README.md"],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "serve": "node bin/outridr.mjs serve",
+    "check": "node --check bin/outridr.mjs && node --check lib/server.mjs && node --check lib/service.mjs && node --check lib/config.mjs"
+  }
+}

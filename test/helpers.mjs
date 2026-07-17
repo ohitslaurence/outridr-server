@@ -34,9 +34,18 @@ export function makeConfig(overrides = {}) {
  * Fake herdr: a unix-socket server matching the real one-request-per-
  * connection protocol. `handler(request)` returns the response object to
  * write as one JSON line, or null/undefined to close without answering.
+ *
+ * `options.afterResponse(socket, responseLine)`, when provided, takes over
+ * the socket instead of the default `socket.end(responseLine)` — used to
+ * simulate a late TCP chunk or a peer RST arriving after a client has
+ * already settled on the first response line.
  */
-export function startFakeHerdr(socketPath, handler) {
+export function startFakeHerdr(socketPath, handler, options = {}) {
   const server = createNetServer((socket) => {
+    // A test-triggered RST (socket.destroy(new Error(...))) emits "error" on
+    // this accepted socket; without a listener it becomes an uncaught
+    // exception and takes down the whole test process.
+    socket.on("error", () => {});
     let buffer = "";
     socket.on("data", (data) => {
       buffer += data.toString("utf8");
@@ -57,7 +66,12 @@ export function startFakeHerdr(socketPath, handler) {
         socket.end();
         return;
       }
-      socket.end(`${JSON.stringify(response)}\n`);
+      const responseLine = `${JSON.stringify(response)}\n`;
+      if (options.afterResponse) {
+        options.afterResponse(socket, responseLine);
+        return;
+      }
+      socket.end(responseLine);
     });
   });
   return new Promise((resolve, reject) => {

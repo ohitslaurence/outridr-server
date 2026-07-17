@@ -34,6 +34,71 @@ test("GET /health — herdr down", async (t) => {
   assert.equal(body.herdr, null);
 }, { timeout: 10_000 });
 
+// Both tests below force a *second* "data" event to arrive on the client's
+// unix socket after the response line has already been parsed: the response
+// line is immediately followed (no delay) by a multi-hundred-KB filler with
+// no newline of its own, which exceeds Node's internal socket read-chunk
+// size and so is delivered to herdrRequest's "data" handler as one or more
+// additional events. Against the pre-fix herdrRequest, the buffer still
+// contains the first (already-handled) newline, so every extra chunk
+// re-triggers the callback — which is exactly the /health double-response
+// (ERR_HTTP_HEADERS_SENT, process crash) and push-watcher poll-multiplication
+// bug this plan fixes. A short delay (setImmediate/setTimeout) before writing
+// the extra bytes does NOT reproduce this reliably: Node's default
+// `allowHalfOpen: false` tears the connection down as soon as the client
+// calls `socket.end()`, before a delayed write/RST can land — so the extra
+// bytes must arrive as part of the same unbroken write.
+const FILLER_BYTES = 2 * 1024 * 1024;
+
+test("GET /health — late TCP chunk after the response line, callback still fires once", async (t) => {
+  const { server, port, config } = await startTestServer();
+  t.after(() => server.close());
+  const herdr = await startFakeHerdr(
+    config.herdrSocket,
+    () => ({ id: "outridr", result: { pong: true } }),
+    {
+      afterResponse: (socket, responseLine) => {
+        socket.end(responseLine + "x".repeat(FILLER_BYTES));
+      },
+    },
+  );
+  t.after(() => herdr.close());
+
+  const first = await getJson(`http://127.0.0.1:${port}/health`);
+  assert.equal(first.status, 200);
+  assert.deepEqual(first.body, { ok: true, herdr: { pong: true }, pushTokens: 0 });
+
+  // A double callback would have thrown ERR_HTTP_HEADERS_SENT inside the
+  // socket's "data" handler and crashed the process — reaching this second
+  // request at all is the regression check.
+  const second = await getJson(`http://127.0.0.1:${port}/health`);
+  assert.equal(second.status, 200);
+});
+
+test("GET /health — herdr RSTs partway through a multi-chunk response, callback still fires once", async (t) => {
+  const { server, port, config } = await startTestServer();
+  t.after(() => server.close());
+  const herdr = await startFakeHerdr(
+    config.herdrSocket,
+    () => ({ id: "outridr", result: { pong: true } }),
+    {
+      afterResponse: (socket, responseLine) => {
+        socket.write(responseLine + "x".repeat(FILLER_BYTES), () => {
+          socket.destroy(new Error("boom"));
+        });
+      },
+    },
+  );
+  t.after(() => herdr.close());
+
+  const first = await getJson(`http://127.0.0.1:${port}/health`);
+  assert.equal(first.status, 200);
+  assert.deepEqual(first.body, { ok: true, herdr: { pong: true }, pushTokens: 0 });
+
+  const second = await getJson(`http://127.0.0.1:${port}/health`);
+  assert.equal(second.status, 200);
+});
+
 test("auth — token required when configured", async (t) => {
   const { server, port } = await startTestServer({ token: "secret" });
   t.after(() => server.close());

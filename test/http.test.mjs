@@ -16,6 +16,9 @@ import {
 } from "./helpers.mjs";
 
 const SERVER_MODULE_PATH = fileURLToPath(new URL("../lib/server.mjs", import.meta.url));
+const PACKAGE_VERSION = JSON.parse(
+  readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"),
+).version;
 
 /** Grabs an ephemeral port and immediately frees it for a subprocess to bind. */
 function reserveFreePort() {
@@ -40,7 +43,7 @@ test("GET /health — happy path", async (t) => {
 
   const { status, body } = await getJson(`http://127.0.0.1:${port}/health`);
   assert.equal(status, 200);
-  assert.deepEqual(body, { ok: true, herdr: { pong: true }, pushTokens: 0 });
+  assert.deepEqual(body, { ok: true, version: PACKAGE_VERSION, herdr: { pong: true }, pushTokens: 0 });
 });
 
 test("GET /health — herdr down", async (t) => {
@@ -84,7 +87,7 @@ test("GET /health — late TCP chunk after the response line, callback still fir
 
   const first = await getJson(`http://127.0.0.1:${port}/health`);
   assert.equal(first.status, 200);
-  assert.deepEqual(first.body, { ok: true, herdr: { pong: true }, pushTokens: 0 });
+  assert.deepEqual(first.body, { ok: true, version: PACKAGE_VERSION, herdr: { pong: true }, pushTokens: 0 });
 
   // A double callback would have thrown ERR_HTTP_HEADERS_SENT inside the
   // socket's "data" handler and crashed the process — reaching this second
@@ -111,7 +114,7 @@ test("GET /health — herdr RSTs partway through a multi-chunk response, callbac
 
   const first = await getJson(`http://127.0.0.1:${port}/health`);
   assert.equal(first.status, 200);
-  assert.deepEqual(first.body, { ok: true, herdr: { pong: true }, pushTokens: 0 });
+  assert.deepEqual(first.body, { ok: true, version: PACKAGE_VERSION, herdr: { pong: true }, pushTokens: 0 });
 
   const second = await getJson(`http://127.0.0.1:${port}/health`);
   assert.equal(second.status, 200);

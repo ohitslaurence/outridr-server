@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
+import { createServer as createNetServer } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   getJson,
@@ -10,6 +13,20 @@ import {
   startFakeHerdr,
   startTestServer,
 } from "./helpers.mjs";
+
+const SERVER_MODULE_PATH = fileURLToPath(new URL("../lib/server.mjs", import.meta.url));
+
+/** Grabs an ephemeral port and immediately frees it for a subprocess to bind. */
+function reserveFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = createNetServer();
+    probe.once("error", reject);
+    probe.listen(0, "127.0.0.1", () => {
+      const { port } = probe.address();
+      probe.close(() => resolve(port));
+    });
+  });
+}
 
 test("GET /health — happy path", async (t) => {
   const { server, port, config } = await startTestServer();
@@ -238,4 +255,42 @@ test("unknown route -> 404", async (t) => {
   t.after(() => server.close());
   const { status } = await getJson(`http://127.0.0.1:${port}/nope`);
   assert.equal(status, 404);
+});
+
+test("startServer — EADDRINUSE on the second listen exits 1 with a server error message", async (t) => {
+  const port = await reserveFreePort();
+  const scriptDir = makeTmpDir("outridr-eaddrinuse");
+  const scriptPath = join(scriptDir, "double-listen.mjs");
+  const config = {
+    port,
+    host: "127.0.0.1",
+    token: null,
+    herdrSocket: join(makeTmpDir("outridr-herdr"), "herdr.sock"),
+    claudeProjectsDir: makeTmpDir("outridr-projects"),
+    exec: null,
+    repos: null,
+    push: { notifyOn: ["blocked", "done"], pollMs: 5000, enabled: false },
+  };
+  writeFileSync(
+    scriptPath,
+    [
+      `import { startServer } from ${JSON.stringify(SERVER_MODULE_PATH)};`,
+      `const config = ${JSON.stringify(config)};`,
+      "startServer(config);",
+      "setTimeout(() => startServer(config), 200);",
+      "",
+    ].join("\n"),
+  );
+
+  const child = spawn(process.execPath, [scriptPath]);
+  let stderr = "";
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk.toString("utf8");
+  });
+  const exitCode = await new Promise((resolve) => {
+    child.on("exit", (code) => resolve(code));
+  });
+
+  assert.equal(exitCode, 1);
+  assert.match(stderr, /outridr: server error:.*EADDRINUSE/);
 });

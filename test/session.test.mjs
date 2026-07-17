@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { appendFileSync, statSync } from "node:fs";
+import { appendFileSync, rmSync, statSync } from "node:fs";
 import { test } from "node:test";
 
 import { getJson, startTestServer, writeSessionFixture } from "./helpers.mjs";
@@ -185,4 +185,23 @@ test("GET /session/<id> — offset beyond file size clamps and returns no entrie
   assert.equal(status, 200);
   assert.deepEqual(body.entries, []);
   assert.ok(body.offset <= size, "offset must be clamped to at most the file size");
+});
+
+test("GET /session/<id> — transcript deleted after registration -> 404, server survives", async (t) => {
+  const sessionId = nextSessionId();
+  const { server, port, config } = await startTestServer();
+  t.after(() => server.close());
+  const filePath = writeSessionFixture(config.claudeProjectsDir, sessionId, [padded(1), padded(2)]);
+
+  const first = await getJson(`http://127.0.0.1:${port}/session/${sessionId}`);
+  assert.equal(first.status, 200);
+
+  rmSync(filePath);
+
+  const second = await getJson(`http://127.0.0.1:${port}/session/${sessionId}`);
+  assert.equal(second.status, 404);
+  assert.deepEqual(second.body, { error: "session transcript not found" });
+
+  const health = await getJson(`http://127.0.0.1:${port}/health`);
+  assert.equal(health.status, 200);
 });

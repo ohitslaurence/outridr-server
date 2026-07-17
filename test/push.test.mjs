@@ -5,19 +5,41 @@ import { after, test } from "node:test";
 
 import { postJson, startFakeExpo, startFakeHerdr, startTestServer } from "./helpers.mjs";
 
-// Env-before-import: OUTRIDR_EXPO_PUSH_URL is read at module load of
-// lib/server.mjs, and startTestServer's dynamic import happens lazily on
-// first call — so the fake Expo server must be up and the env var set
-// before any test() body below makes its first startTestServer() call.
+// Env-before-import: OUTRIDR_EXPO_PUSH_URL and OUTRIDR_RECEIPT_CHECK_MS are
+// read at module load of lib/push.mjs (imported by lib/server.mjs), and
+// startTestServer's dynamic import happens lazily on first call — so both
+// must be set, and the fake Expo server must be up, before any test() body
+// below makes its first startTestServer() call OR the first dynamic import
+// of lib/push.mjs (module instances are cached by resolved URL, so a static
+// import here would evaluate push.mjs too early and poison the cache for
+// every later import, including the one inside lib/server.mjs).
 const fakeExpo = await startFakeExpo();
 process.env.OUTRIDR_EXPO_PUSH_URL = fakeExpo.url;
+process.env.OUTRIDR_RECEIPT_CHECK_MS = "100";
 after(() => fakeExpo.close());
 
+const { chunkArray, EXPO_BATCH_LIMIT, receiptsUrl } = await import("../lib/push.mjs");
+
+// Leaked-watcher note: startPushWatcher()'s poll and receipt-check timers
+// are never stopped (server.close() doesn't touch them), so every test
+// below that enables push leaves its watcher — and its pushTokens closure —
+// running in the background for the rest of this file's process. The poll
+// loop goes dormant once its herdr socket closes (herdrRequest just errors),
+// but the receipt-check loop is herdr-independent and keeps querying
+// lib/push.mjs's single *module-level* pendingReceipts list, shared by every
+// watcher in the process, on its own schedule. That's harmless as long as
+// (a) each test uses token/ticket-id strings unique to it, so a stale
+// watcher's pushTokens.tokens.has(token) guard (see checkReceipts) never
+// matches another test's token, and (b) assertions about receipt-check
+// requests tolerate extra/overlapping requests from other still-running
+// watchers rather than asserting exact call counts.
 const defaultResponder = (messages) => messages.map(() => ({ status: "ok", id: "fake-id" }));
 
 function resetFakeExpo() {
   fakeExpo.requests.length = 0;
+  fakeExpo.receiptsRequests.length = 0;
   fakeExpo.setResponse(defaultResponder);
+  fakeExpo.setReceipts(() => ({}));
 }
 
 function resetPushTokenState() {
@@ -42,6 +64,31 @@ function sleep(ms) {
 function readPersistedTokens() {
   return JSON.parse(readFileSync(join(process.env.OUTRIDR_STATE_DIR, "push-tokens.json"), "utf8"));
 }
+
+test("receiptsUrl — derives the getReceipts endpoint from a real send URL", () => {
+  const url = receiptsUrl("https://exp.host/--/api/v2/push/send");
+  assert.equal(url.origin, "https://exp.host");
+  assert.equal(url.pathname, "/--/api/v2/push/getReceipts");
+});
+
+test("receiptsUrl — falls back to appending the path for a URL with no trailing /send", () => {
+  const url = receiptsUrl("http://127.0.0.1:9999/");
+  assert.ok(url.pathname.endsWith("/getReceipts"), `expected path to end with /getReceipts, got ${url.pathname}`);
+});
+
+test("chunkArray — splits into groups of size, batching sendExpoPush past EXPO_BATCH_LIMIT", () => {
+  assert.equal(EXPO_BATCH_LIMIT, 100);
+  const tokens = Array.from({ length: 101 }, (_, i) => `token-${i}`);
+  const batches = chunkArray(tokens, EXPO_BATCH_LIMIT);
+  assert.equal(batches.length, 2);
+  assert.equal(batches[0].length, 100);
+  assert.equal(batches[1].length, 1);
+  assert.deepEqual(batches.flat(), tokens);
+});
+
+test("chunkArray — a single short array is a single chunk", () => {
+  assert.deepEqual(chunkArray([1, 2, 3], 100), [[1, 2, 3]]);
+});
 
 test("POST /push/unregister — removes a token, is idempotent for unknown tokens", async (t) => {
   resetPushTokenState();
@@ -269,4 +316,153 @@ test("push watcher — an agent that vanishes and reappears still-notify-worthy 
 
   await sleep(50 * 4);
   assert.equal(fakeExpo.requests.length, 2, "status stays blocked afterward — no additional pushes");
+});
+
+test("push watcher — a DeviceNotRegistered receipt (delivery-layer failure) prunes the token", async (t) => {
+  resetPushTokenState();
+  resetFakeExpo();
+  const { server, port, config } = await startTestServer({
+    push: { enabled: true, pollMs: 50, notifyOn: ["blocked", "done"] },
+  });
+  t.after(() => server.close());
+
+  let pollCount = 0;
+  const herdr = await startFakeHerdr(config.herdrSocket, (request) => {
+    if (request.method !== "agent.list") {
+      return { id: request.id, result: {} };
+    }
+    pollCount += 1;
+    const status = pollCount === 1 ? "working" : "blocked";
+    return {
+      id: request.id,
+      result: { agents: [{ terminal_id: "agent-a", agent_status: status, name: "Agent A" }] },
+    };
+  });
+  t.after(() => herdr.close());
+
+  const liveToken = "ExponentPushToken[receipt-live]";
+  const deadToken = "ExponentPushToken[receipt-dead]";
+  await postJson(`http://127.0.0.1:${port}/push/register`, { token: liveToken, device: "phone-live" });
+  await postJson(`http://127.0.0.1:${port}/push/register`, { token: deadToken, device: "phone-dead" });
+
+  // Ticket-level status is "ok" for both — Expo accepted them — but the
+  // dead token later fails at the APNs/FCM layer, surfaced only via the
+  // receipts endpoint.
+  const liveTicketId = "ticket-receipt-live";
+  const deadTicketId = "ticket-receipt-dead";
+  fakeExpo.setResponse([
+    { status: "ok", id: liveTicketId },
+    { status: "ok", id: deadTicketId },
+  ]);
+
+  await waitFor(() => fakeExpo.requests.length >= 1);
+  assert.equal(readPersistedTokens().length, 2, "ok tickets must not prune synchronously");
+
+  fakeExpo.setReceipts((ids) => {
+    const data = {};
+    if (ids.includes(deadTicketId)) {
+      data[deadTicketId] = { status: "error", message: "not registered", details: { error: "DeviceNotRegistered" } };
+    }
+    return data;
+  });
+
+  await waitFor(
+    () => {
+      const persisted = readPersistedTokens();
+      return persisted.length === 1 && persisted[0].token === liveToken;
+    },
+    { timeoutMs: 3000 },
+  );
+});
+
+test("push watcher — an ok receipt stops further receipt polling for that ticket", async (t) => {
+  resetPushTokenState();
+  resetFakeExpo();
+  const { server, port, config } = await startTestServer({
+    push: { enabled: true, pollMs: 50, notifyOn: ["blocked", "done"] },
+  });
+  t.after(() => server.close());
+
+  let pollCount = 0;
+  const herdr = await startFakeHerdr(config.herdrSocket, (request) => {
+    if (request.method !== "agent.list") {
+      return { id: request.id, result: {} };
+    }
+    pollCount += 1;
+    const status = pollCount === 1 ? "working" : "blocked";
+    return {
+      id: request.id,
+      result: { agents: [{ terminal_id: "agent-a", agent_status: status, name: "Agent A" }] },
+    };
+  });
+  t.after(() => herdr.close());
+
+  const token = "ExponentPushToken[receipt-ok]";
+  await postJson(`http://127.0.0.1:${port}/push/register`, { token, device: "phone" });
+
+  const ticketId = "ticket-receipt-ok";
+  fakeExpo.setResponse([{ status: "ok", id: ticketId }]);
+
+  await waitFor(() => fakeExpo.requests.length >= 1);
+
+  fakeExpo.setReceipts((ids) => (ids.includes(ticketId) ? { [ticketId]: { status: "ok" } } : {}));
+
+  await waitFor(() => fakeExpo.receiptsRequests.some((ids) => ids.includes(ticketId)), { timeoutMs: 3000 });
+  // Other in-process watcher timers (see helpers.mjs/leaked-watcher note in
+  // this file's header) can have a request for this id already in flight
+  // when the receipt lands, so give that wave a moment to drain before
+  // starting a clean "is it still being polled" observation window.
+  await sleep(50 * 6);
+  const seenAt = fakeExpo.receiptsRequests.length;
+
+  await sleep(50 * 6);
+  const laterRequests = fakeExpo.receiptsRequests.slice(seenAt);
+  assert.ok(laterRequests.length > 0, "expected more receipt-check cycles to run after the receipt arrived");
+  assert.ok(
+    laterRequests.every((ids) => !ids.includes(ticketId)),
+    "an id should stop being polled once its receipt has arrived",
+  );
+});
+
+test("push watcher — a non-DeviceNotRegistered receipt error does not prune the token", async (t) => {
+  resetPushTokenState();
+  resetFakeExpo();
+  const { server, port, config } = await startTestServer({
+    push: { enabled: true, pollMs: 50, notifyOn: ["blocked", "done"] },
+  });
+  t.after(() => server.close());
+
+  let pollCount = 0;
+  const herdr = await startFakeHerdr(config.herdrSocket, (request) => {
+    if (request.method !== "agent.list") {
+      return { id: request.id, result: {} };
+    }
+    pollCount += 1;
+    const status = pollCount === 1 ? "working" : "blocked";
+    return {
+      id: request.id,
+      result: { agents: [{ terminal_id: "agent-a", agent_status: status, name: "Agent A" }] },
+    };
+  });
+  t.after(() => herdr.close());
+
+  const token = "ExponentPushToken[receipt-rate]";
+  await postJson(`http://127.0.0.1:${port}/push/register`, { token, device: "phone" });
+
+  const ticketId = "ticket-receipt-rate";
+  fakeExpo.setResponse([{ status: "ok", id: ticketId }]);
+
+  await waitFor(() => fakeExpo.requests.length >= 1);
+
+  fakeExpo.setReceipts((ids) =>
+    ids.includes(ticketId)
+      ? { [ticketId]: { status: "error", message: "rate exceeded", details: { error: "MessageRateExceeded" } } }
+      : {},
+  );
+
+  await waitFor(() => fakeExpo.receiptsRequests.some((ids) => ids.includes(ticketId)), { timeoutMs: 3000 });
+  await sleep(50 * 5);
+  const persisted = readPersistedTokens();
+  assert.equal(persisted.length, 1, "only DeviceNotRegistered receipts should prune a token");
+  assert.equal(persisted[0].token, token);
 });

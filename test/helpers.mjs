@@ -86,10 +86,17 @@ export function startFakeHerdr(socketPath, handler, options = {}) {
  * parsed message array and answers with a configurable ticket list wrapped
  * in Expo's `{data: [...]}` envelope. `setResponse` accepts either a fixed
  * tickets array or a function `(messages) => tickets` for per-call control.
+ *
+ * Also serves the receipts endpoint (any path ending `/getReceipts`):
+ * captures each request's `ids` array into `receiptsRequests` and answers
+ * with `{data: <receipts>}`, configurable via `setReceipts(dataOrFn)` where
+ * `fn` receives the requested `ids` and returns the receipts map.
  */
 export function startFakeExpo() {
   const requests = [];
+  const receiptsRequests = [];
   let responder = (messages) => messages.map(() => ({ status: "ok", id: "fake-id" }));
+  let receiptsResponder = () => ({});
 
   const server = createHttpServer((req, res) => {
     if (req.method !== "POST") {
@@ -99,18 +106,23 @@ export function startFakeExpo() {
     const chunks = [];
     req.on("data", (chunk) => chunks.push(chunk));
     req.on("end", () => {
-      let messages;
+      let body;
       try {
-        messages = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+        body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
       } catch {
         res.writeHead(400).end();
         return;
       }
-      requests.push(messages);
-      const tickets = responder(messages);
-      const body = JSON.stringify({ data: tickets });
+      if (req.url.endsWith("/getReceipts")) {
+        receiptsRequests.push(body.ids);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ data: receiptsResponder(body.ids) }));
+        return;
+      }
+      requests.push(body);
+      const tickets = responder(body);
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(body);
+      res.end(JSON.stringify({ data: tickets }));
     });
   });
 
@@ -121,8 +133,12 @@ export function startFakeExpo() {
       resolve({
         url: `http://127.0.0.1:${port}`,
         requests,
+        receiptsRequests,
         setResponse(ticketsOrFn) {
           responder = typeof ticketsOrFn === "function" ? ticketsOrFn : () => ticketsOrFn;
+        },
+        setReceipts(dataOrFn) {
+          receiptsResponder = typeof dataOrFn === "function" ? dataOrFn : () => dataOrFn;
         },
         close() {
           return new Promise((res) => server.close(() => res()));

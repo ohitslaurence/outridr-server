@@ -159,6 +159,70 @@ test("pipelined head — a frame sent in the same write as the handshake is not 
   assert.deepEqual(response, { id: "h1", result: { ok: true } });
 });
 
+test("oversized frame — a declared length beyond the cap closes 1009 before the payload arrives", async (t) => {
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const client = await connectRawWs(port, "/herdr");
+  t.after(() => client.close());
+  assert.equal(client.statusCode, 101);
+
+  // Hand-roll a masked frame header declaring a 2 MiB payload; the payload
+  // itself is never sent, proving the server rejects on the header alone.
+  const declaredLength = 2 * 1024 * 1024;
+  const header = Buffer.alloc(14);
+  header[0] = 0x80 | 0x1; // fin + text opcode
+  header[1] = 0x80 | 127; // masked + 64-bit length marker
+  header.writeBigUInt64BE(BigInt(declaredLength), 2);
+  Buffer.from([0x01, 0x02, 0x03, 0x04]).copy(header, 10);
+  client.socket.write(header);
+
+  const frame = await client.nextFrame();
+  assert.equal(frame.opcode, 0x8);
+  assert.equal(frame.payload.readUInt16BE(0), 1009);
+});
+
+test("fragment flood — accumulated fragments beyond the cap close 1009", async (t) => {
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const client = await connectRawWs(port, "/herdr");
+  t.after(() => client.close());
+  assert.equal(client.statusCode, 101);
+
+  const chunk = Buffer.alloc(64 * 1024, 0x61); // well under the per-frame cap
+  const framesNeeded = Math.ceil((4 * 1024 * 1024) / chunk.length) + 2;
+  client.sendFrame(0x1, chunk, { fin: false });
+  for (let i = 1; i < framesNeeded; i++) {
+    client.sendFrame(0x0, chunk, { fin: false });
+  }
+
+  const frame = await client.nextFrame();
+  assert.equal(frame.opcode, 0x8);
+  assert.equal(frame.payload.readUInt16BE(0), 1009);
+});
+
+test("large-but-legal frame — a ~100 KiB masked text frame still round-trips", async (t) => {
+  const { server, port, config } = await startTestServer();
+  t.after(() => server.close());
+  const herdr = await startFakeHerdr(config.herdrSocket, (request) =>
+    request.id === "big1" ? { id: "big1", result: { ok: true } } : null,
+  );
+  t.after(() => herdr.close());
+
+  const client = await connectRawWs(port, "/herdr");
+  t.after(() => client.close());
+  assert.equal(client.statusCode, 101);
+
+  const padding = "x".repeat(100 * 1024);
+  const message = JSON.stringify({ id: "big1", method: "ping", params: {}, padding });
+  client.sendText(message);
+
+  const frame = await client.nextFrame();
+  const response = frameJson(frame);
+  assert.deepEqual(response, { id: "big1", result: { ok: true } });
+});
+
 test("close — server responds with close frame and ends the TCP socket", async (t) => {
   const { server, port } = await startTestServer();
   t.after(() => server.close());

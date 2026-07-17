@@ -81,6 +81,10 @@ function waitForExit(child, timeoutMs = 10000) {
   });
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function baseEnv(overrides = {}) {
   return {
     PATH: process.env.PATH,
@@ -180,4 +184,102 @@ test("host resolution: tailscale fails twice then succeeds -> server eventually 
 
   await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
   assert.match(output.stderr, /waiting for a Tailscale IPv4/);
+});
+
+test("host re-check: Tailscale IPv4 changes after listen -> subprocess exits 1", async (t) => {
+  const fakeDir = makeTmpDir("outridr-fake-tailscale");
+  const countFile = join(fakeDir, "count");
+  writeFakeTailscale(
+    fakeDir,
+    [
+      "#!/bin/sh",
+      `COUNT_FILE="${countFile}"`,
+      "COUNT=0",
+      'if [ -f "$COUNT_FILE" ]; then COUNT=$(cat "$COUNT_FILE"); fi',
+      "COUNT=$((COUNT + 1))",
+      'echo "$COUNT" > "$COUNT_FILE"',
+      'if [ "$COUNT" -eq 1 ]; then',
+      "  echo 127.0.0.1",
+      "else",
+      "  echo 127.0.0.2",
+      "fi",
+      "",
+    ].join("\n"),
+  );
+  const scriptPath = writeChildScript(childConfig());
+  const { child, output } = spawnChild(
+    scriptPath,
+    baseEnv({
+      // Shells out to `cat` internally, so PATH needs real system dirs too —
+      // fakeDir still wins the `tailscale` lookup because it's listed first.
+      PATH: `${fakeDir}:/bin:/usr/bin`,
+      OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
+      OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
+      OUTRIDR_HOST_RECHECK_MS: "100",
+    }),
+  );
+  t.after(() => child.kill());
+
+  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  const { code } = await waitForExit(child);
+  assert.equal(code, 1);
+  assert.match(output.stderr, /Tailscale IPv4 changed/);
+});
+
+test("host re-check: Tailscale IPv4 unchanged -> subprocess stays alive", async (t) => {
+  const fakeDir = writeFakeTailscale(makeTmpDir("outridr-fake-tailscale"), "#!/bin/sh\necho 127.0.0.1\n");
+  const scriptPath = writeChildScript(childConfig());
+  const { child, output } = spawnChild(
+    scriptPath,
+    baseEnv({
+      PATH: fakeDir,
+      OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
+      OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
+      OUTRIDR_HOST_RECHECK_MS: "100",
+    }),
+  );
+  t.after(() => child.kill());
+
+  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  await delay(500);
+  assert.equal(child.exitCode, null);
+  child.kill();
+});
+
+test("host re-check: transient Tailscale failure after listen -> subprocess stays alive", async (t) => {
+  const fakeDir = makeTmpDir("outridr-fake-tailscale");
+  const countFile = join(fakeDir, "count");
+  writeFakeTailscale(
+    fakeDir,
+    [
+      "#!/bin/sh",
+      `COUNT_FILE="${countFile}"`,
+      "COUNT=0",
+      'if [ -f "$COUNT_FILE" ]; then COUNT=$(cat "$COUNT_FILE"); fi',
+      "COUNT=$((COUNT + 1))",
+      'echo "$COUNT" > "$COUNT_FILE"',
+      'if [ "$COUNT" -eq 1 ]; then',
+      "  echo 127.0.0.1",
+      "else",
+      "  exit 1",
+      "fi",
+      "",
+    ].join("\n"),
+  );
+  const scriptPath = writeChildScript(childConfig());
+  const { child, output } = spawnChild(
+    scriptPath,
+    baseEnv({
+      PATH: `${fakeDir}:/bin:/usr/bin`,
+      OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
+      OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
+      OUTRIDR_HOST_RECHECK_MS: "100",
+    }),
+  );
+  t.after(() => child.kill());
+
+  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  await delay(500);
+  assert.equal(child.exitCode, null);
+  child.kill();
 });

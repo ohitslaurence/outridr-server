@@ -61,7 +61,15 @@ Everything is optional. `~/.config/outridr/config.json`:
 ```
 
 - `host`: a literal address, or `"tailscale"` to bind the machine's Tailscale
-  IPv4 (the default — tailnet-only exposure).
+  IPv4 (the default — tailnet-only exposure). Resolving `"tailscale"` shells
+  out to `tailscale ip -4`, retrying briefly if it fails (common right after
+  boot, before `tailscaled` has an address). If it still can't find one, the
+  process exits non-zero rather than silently falling back to a loopback
+  bind — under the installed service this means the supervisor
+  (`Restart=on-failure` / `KeepAlive.Crashed`) keeps retrying until
+  Tailscale comes up; in a foreground `outridr serve` it means the shell
+  exits with a clear error instead of the app quietly binding somewhere
+  unreachable.
 - `token`: optional bearer/`?token=` check on every request, for defense in
   depth on top of tailnet ACLs.
 - `exec`/`repos`: absent = endpoints disabled. `exec` runs exactly the one

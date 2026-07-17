@@ -137,26 +137,30 @@ export function writeSessionFixture(projectsDir, sessionId, lines, options = {})
 
 // ── Raw WebSocket client (manual RFC6455 handshake + framing) ──────────────
 
-function encodeMaskedFrame(opcode, payload, { fin = true } = {}) {
-  const mask = randomBytes(4);
-  const maskedPayload = Buffer.alloc(payload.length);
-  for (let i = 0; i < payload.length; i++) {
-    maskedPayload[i] = payload[i] ^ mask[i % 4];
-  }
+export function encodeMaskedFrame(opcode, payload, { fin = true, mask: shouldMask = true } = {}) {
   const firstByte = (fin ? 0x80 : 0x00) | (opcode & 0x0f);
+  const maskBit = shouldMask ? 0x80 : 0x00;
   let header;
   if (payload.length < 126) {
-    header = Buffer.from([firstByte, 0x80 | payload.length]);
+    header = Buffer.from([firstByte, maskBit | payload.length]);
   } else if (payload.length < 65536) {
     header = Buffer.alloc(4);
     header[0] = firstByte;
-    header[1] = 0x80 | 126;
+    header[1] = maskBit | 126;
     header.writeUInt16BE(payload.length, 2);
   } else {
     header = Buffer.alloc(10);
     header[0] = firstByte;
-    header[1] = 0x80 | 127;
+    header[1] = maskBit | 127;
     header.writeBigUInt64BE(BigInt(payload.length), 2);
+  }
+  if (!shouldMask) {
+    return Buffer.concat([header, payload]);
+  }
+  const mask = randomBytes(4);
+  const maskedPayload = Buffer.alloc(payload.length);
+  for (let i = 0; i < payload.length; i++) {
+    maskedPayload[i] = payload[i] ^ mask[i % 4];
   }
   return Buffer.concat([header, mask, maskedPayload]);
 }
@@ -207,8 +211,11 @@ function decodeFrame(buffer) {
  * Connects to `path` on `port`, performs the RFC6455 handshake, and resolves
  * with a client that can send masked frames and await decoded frames from
  * the server. `headers` are appended verbatim to the upgrade request.
+ * `pipelinedData`, if given, is a Buffer written in the SAME `socket.write`
+ * call as the handshake request — simulating a client that pipelines its
+ * first frame with the upgrade (exercises the `upgrade` event's `head`).
  */
-export function connectRawWs(port, path, { headers = {} } = {}) {
+export function connectRawWs(port, path, { headers = {}, pipelinedData = null } = {}) {
   return new Promise((resolve, reject) => {
     const socket = netConnect(port, "127.0.0.1");
     const key = randomBytes(16).toString("base64");
@@ -256,7 +263,8 @@ export function connectRawWs(port, path, { headers = {} } = {}) {
         "",
         "",
       ].join("\r\n");
-      socket.write(requestHeaders);
+      const headerBuffer = Buffer.from(requestHeaders, "utf8");
+      socket.write(pipelinedData ? Buffer.concat([headerBuffer, pipelinedData]) : headerBuffer);
     });
 
     socket.on("data", (data) => {

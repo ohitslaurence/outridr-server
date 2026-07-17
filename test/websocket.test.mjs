@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
 
-import { connectRawWs, startFakeHerdr, startTestServer } from "./helpers.mjs";
+import { connectRawWs, encodeMaskedFrame, startFakeHerdr, startTestServer } from "./helpers.mjs";
 
 const WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
@@ -137,6 +137,26 @@ test("fragmented message — continuation frame is reassembled and answered", as
   const frame = await client.nextFrame();
   const response = frameJson(frame);
   assert.deepEqual(response, { id: "f1", result: { ok: true } });
+});
+
+test("pipelined head — a frame sent in the same write as the handshake is not dropped", async (t) => {
+  const { server, port, config } = await startTestServer();
+  t.after(() => server.close());
+  const herdr = await startFakeHerdr(config.herdrSocket, (request) =>
+    request.id === "h1" ? { id: "h1", result: { ok: true } } : null,
+  );
+  t.after(() => herdr.close());
+
+  const message = JSON.stringify({ id: "h1", method: "ping", params: {} });
+  const pipelinedData = encodeMaskedFrame(0x1, Buffer.from(message, "utf8"));
+
+  const client = await connectRawWs(port, "/herdr", { pipelinedData });
+  t.after(() => client.close());
+  assert.equal(client.statusCode, 101);
+
+  const frame = await client.nextFrame();
+  const response = frameJson(frame);
+  assert.deepEqual(response, { id: "h1", result: { ok: true } });
 });
 
 test("close — server responds with close frame and ends the TCP socket", async (t) => {

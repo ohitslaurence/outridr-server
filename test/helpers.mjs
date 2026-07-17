@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { createServer as createHttpServer } from "node:http";
 import { createServer as createNetServer, connect as netConnect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -77,6 +78,57 @@ export function startFakeHerdr(socketPath, handler, options = {}) {
   return new Promise((resolve, reject) => {
     server.once("error", reject);
     server.listen(socketPath, () => resolve(server));
+  });
+}
+
+/**
+ * Fake Expo push endpoint: an HTTP server that captures each request's
+ * parsed message array and answers with a configurable ticket list wrapped
+ * in Expo's `{data: [...]}` envelope. `setResponse` accepts either a fixed
+ * tickets array or a function `(messages) => tickets` for per-call control.
+ */
+export function startFakeExpo() {
+  const requests = [];
+  let responder = (messages) => messages.map(() => ({ status: "ok", id: "fake-id" }));
+
+  const server = createHttpServer((req, res) => {
+    if (req.method !== "POST") {
+      res.writeHead(404).end();
+      return;
+    }
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      let messages;
+      try {
+        messages = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      } catch {
+        res.writeHead(400).end();
+        return;
+      }
+      requests.push(messages);
+      const tickets = responder(messages);
+      const body = JSON.stringify({ data: tickets });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(body);
+    });
+  });
+
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const { port } = server.address();
+      resolve({
+        url: `http://127.0.0.1:${port}`,
+        requests,
+        setResponse(ticketsOrFn) {
+          responder = typeof ticketsOrFn === "function" ? ticketsOrFn : () => ticketsOrFn;
+        },
+        close() {
+          return new Promise((res) => server.close(() => res()));
+        },
+      });
+    });
   });
 }
 

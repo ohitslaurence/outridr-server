@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
+import { request as httpRequest } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -152,6 +153,52 @@ test("POST /push/register — valid token persists and increments count", async 
   const persisted = JSON.parse(readFileSync(stateFile, "utf8"));
   assert.equal(persisted.length, 1);
   assert.equal(persisted[0].token, "ExponentPushToken[abc]");
+});
+
+test("POST /push/register — multibyte device name split mid-character across two chunks", async (t) => {
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  // "🎉" is U+1F389, encoded as the 4 utf8 bytes F0 9F 8E 89. Split the
+  // request body so that split falls between the 2nd and 3rd byte of the
+  // emoji — a naive `body += chunk` (implicit per-chunk toString) decodes
+  // each half independently and replaces both incomplete sequences with
+  // U+FFFD, corrupting the device string.
+  const device = "phone-🎉";
+  const payload = Buffer.from(JSON.stringify({ token: "ExponentPushToken[abc]", device }), "utf8");
+  const emojiStart = payload.indexOf(Buffer.from("🎉", "utf8"));
+  const splitAt = emojiStart + 2;
+
+  const { status, body } = await new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: "/push/register",
+        method: "POST",
+        headers: { "content-type": "application/json", "content-length": payload.length },
+      },
+      (res) => {
+        let raw = "";
+        res.on("data", (chunk) => (raw += chunk));
+        res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(raw) }));
+      },
+    );
+    req.on("error", reject);
+    req.write(payload.subarray(0, splitAt));
+    setTimeout(() => {
+      req.write(payload.subarray(splitAt));
+      req.end();
+    }, 20);
+  });
+
+  assert.equal(status, 200);
+  assert.deepEqual(body, { ok: true, registered: 1 });
+
+  const stateFile = join(process.env.OUTRIDR_STATE_DIR, "push-tokens.json");
+  const persisted = JSON.parse(readFileSync(stateFile, "utf8"));
+  const registered = persisted.find((entry) => entry.token === "ExponentPushToken[abc]");
+  assert.equal(registered.device, device, "multibyte device name must survive the mid-character split intact");
 });
 
 test("POST /push/register — malformed JSON body -> 400", async (t) => {

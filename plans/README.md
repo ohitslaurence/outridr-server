@@ -24,7 +24,7 @@ below so they aren't re-audited.
 | 007  | Expo push receipts polling + 100-message batching | P3 | M | 006 | DONE (executed 2026-07-17, reviewed & merged to main as `ea7e41e`) |
 | 008  | Operational polish (Tailscale IP re-check, launchctl bootstrap/bootout, plist escaping) | P3 | S–M | 006 | DONE (executed 2026-07-17, reviewed & merged to main as `f6e170b`; launchctl paths need one manual macOS install/status/uninstall check by the operator) |
 | 009  | README overhaul for public release | P2 | M | 006–008 | DONE (executed 2026-07-17, reviewed with editorial pass, merged to main as `45dbe2b`) |
-| 010  | npm release readiness (metadata, 0.2.0, publish guard) | P2 | S | 006–009 | IN PROGRESS (executor dispatched 2026-07-17) |
+| 010  | npm release readiness (metadata, 0.2.0, publish guard) | P2 | S | 006–009 | DONE (executed 2026-07-17, reviewed & merged to main as `52a4083`; publish itself awaits operator npm login) |
 
 ## Watch items
 

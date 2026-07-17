@@ -20,6 +20,16 @@ below so they aren't re-audited.
 | 003  | WebSocket hardening (head buffer, size caps, masking) | P1 | M | 001 | DONE (executed 2026-07-17, reviewed & merged to main as `e1a5dff`) |
 | 004  | Tailscale bind recovery (retry, then fail fast) | P2 | S | 001, 002 | DONE (executed 2026-07-17, reviewed & merged to main as `1447280`) |
 | 005  | Push token lifecycle (prune dead tokens, unregister, watcher cleanup) | P2 | M | 001, 002 | DONE (executed 2026-07-17, reviewed & merged to main as `8ee9519`) |
+| 006  | Split lib/server.mjs into focused modules | P2 | M | 001–005 | DONE (executed 2026-07-17, reviewed & merged to main as `e922b91`) |
+| 007  | Expo push receipts polling + 100-message batching | P3 | M | 006 | DONE (executed 2026-07-17, reviewed & merged to main as `ea7e41e`) |
+| 008  | Operational polish (Tailscale IP re-check, launchctl bootstrap/bootout, plist escaping) | P3 | S–M | 006 | DONE (executed 2026-07-17, reviewed & merged to main as `f6e170b`; launchctl paths need one manual macOS install/status/uninstall check by the operator) |
+| 009  | README overhaul for public release | P2 | M | 006–008 | DONE (executed 2026-07-17, reviewed with editorial pass, merged to main as `45dbe2b`) |
+| 010  | npm release readiness (metadata, 0.2.0, publish guard) | P2 | S | 006–009 | IN PROGRESS (executor dispatched 2026-07-17) |
+
+## Watch items
+
+- One timer-related test flake observed once by the plan-009 executor (1/3 runs in its worktree); not reproducible on main (5/5 clean). If CI shows intermittent failures in host-recheck or push-watcher tests, widen their timing tolerances.
+- launchctl bootstrap/bootout paths (plan 008) still need one manual `outridr install`/`status`/`uninstall` round on the operator's Mac.
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 

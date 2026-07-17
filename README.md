@@ -146,9 +146,9 @@ default 60000).
 
 Bind to the Tailscale interface and let your tailnet ACLs decide who can
 reach outridr — that's the actual perimeter. herdr's own socket has no
-auth, so be honest with yourself about what this means: anyone who can
-reach outridr can drive your agents through it. The optional `token` is a
-second factor on top of the tailnet boundary, not a replacement for it.
+auth, so the threat model is simple: anyone who can reach outridr can
+drive your agents through it. The optional `token` is a second factor on
+top of the tailnet boundary, not a replacement for it.
 `exec` and `repos` run arbitrary configured commands and are opt-in for
 exactly that reason — they're off unless you explicitly configure them.
 Do not bind `0.0.0.0` on a machine with a public interface.
@@ -166,9 +166,9 @@ outridr config       Print resolved configuration
 `outridr install` writes a systemd user unit (Linux, plus `loginctl
 enable-linger` so it survives logout) or a launchd agent (macOS, loaded via
 `launchctl bootstrap`/removed via `bootout`). Both pin the absolute path of
-the *current* `node` binary and this package's entrypoint, so fnm/mise/nvm-
-managed installs work under the service manager even though it doesn't see
-your shell's version-manager setup. The service restarts on failure: if it
+the *current* `node` binary and this package's entrypoint, so installs
+managed by fnm/mise/nvm work under the service manager even though it
+doesn't see your shell's version-manager setup. The service restarts on failure: if it
 starts before `tailscaled` has an address (common right after boot), it
 retries briefly then exits, and the restart brings it back once Tailscale
 is up; if the Tailscale IP changes while it's running, it exits so the same

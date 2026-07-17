@@ -8,7 +8,7 @@
   "bin": {
     "outridr": "./bin/outridr.mjs"
   },
-  "files": ["bin", "lib", "herdr-plugin.toml", "README.md"],
+  "files": ["bin", "lib", "README.md"],
   "engines": {
     "node": ">=20"
   },

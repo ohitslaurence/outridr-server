@@ -17,13 +17,6 @@ On the machine running herdr (with [Tailscale](https://tailscale.com) up):
 npx outridr install     # installs + starts a user service (systemd/launchd)
 ```
 
-or as a herdr plugin:
-
-```sh
-herdr plugin install ohitslaurence/outridr
-# then run the "outridr: install service" action
-```
-
 Check it:
 
 ```sh

@@ -233,6 +233,11 @@ export function connectRawWs(port, path, { headers = {}, pipelinedData = null } 
       sendText(text, options = {}) {
         client.sendFrame(0x1, Buffer.from(text, "utf8"), options);
       },
+      // RFC 6455 requires client frames to be masked; this sends an unmasked
+      // one to exercise the server's protocol-conformance rejection (1002).
+      sendUnmaskedFrame(opcode, payload = Buffer.alloc(0), options = {}) {
+        socket.write(encodeMaskedFrame(opcode, payload, { ...options, mask: false }));
+      },
       nextFrame(timeoutMs = 5000) {
         return new Promise((res, rej) => {
           if (frameQueue.length > 0) {

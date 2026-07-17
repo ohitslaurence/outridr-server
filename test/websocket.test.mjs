@@ -223,6 +223,21 @@ test("large-but-legal frame — a ~100 KiB masked text frame still round-trips",
   assert.deepEqual(response, { id: "big1", result: { ok: true } });
 });
 
+test("unmasked frame — a valid but unmasked client frame closes 1002", async (t) => {
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const client = await connectRawWs(port, "/herdr");
+  t.after(() => client.close());
+  assert.equal(client.statusCode, 101);
+
+  client.sendUnmaskedFrame(0x1, Buffer.from(JSON.stringify({ id: "u1", method: "ping", params: {} }), "utf8"));
+
+  const frame = await client.nextFrame();
+  assert.equal(frame.opcode, 0x8);
+  assert.equal(frame.payload.readUInt16BE(0), 1002);
+});
+
 test("close — server responds with close frame and ends the TCP socket", async (t) => {
   const { server, port } = await startTestServer();
   t.after(() => server.close());

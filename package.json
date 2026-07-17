@@ -15,6 +15,6 @@
   "scripts": {
     "serve": "node bin/outridr.mjs serve",
     "check": "node --check bin/outridr.mjs && node --check lib/server.mjs && node --check lib/service.mjs && node --check lib/config.mjs",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   }
 }

@@ -39,6 +39,7 @@ Then point the outridr app at this machine's tailnet hostname. Done.
 | `WS /herdr` | NDJSON session to herdr's socket API. herdr closes its socket after each response, so outridr opens one unix connection per request line and multiplexes replies back over the websocket, correlated by request id. |
 | `GET /session/<id>` | Byte-offset windows over a Claude Code session transcript (`~/.claude/projects/**/<id>.jsonl`): tail, forward polling, and backward history pagination. |
 | `POST /push/register` | Register an Expo push token. A watcher polls agent statuses and pushes when an agent transitions to `blocked`/`done`. |
+| `POST /push/unregister` | Remove a previously registered push token. |
 | `GET /health` | Liveness probe (pings herdr through its socket). |
 | `POST /exec` † | Run your configured task CLI (e.g. a worktree-task spawner). |
 | `GET /repos` † | Run your configured repo-listing command. |
@@ -76,7 +77,8 @@ Everything is optional. `~/.config/outridr/config.json`:
   configured binary with client-supplied args.
 
 Env overrides: `OUTRIDR_PORT`, `OUTRIDR_HOST`, `OUTRIDR_TOKEN`,
-`OUTRIDR_CONFIG`, `HERDR_SOCKET_PATH`, `CLAUDE_PROJECTS_DIR`.
+`OUTRIDR_CONFIG`, `HERDR_SOCKET_PATH`, `CLAUDE_PROJECTS_DIR`,
+`OUTRIDR_EXPO_PUSH_URL`.
 
 ## Security model
 

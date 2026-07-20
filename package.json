@@ -18,6 +18,7 @@
   "scripts": {
     "serve": "node bin/outridr.mjs serve",
     "check": "node --check bin/outridr.mjs && node --check lib/config.mjs && node --check lib/herdr.mjs && node --check lib/http-util.mjs && node --check lib/push.mjs && node --check lib/server.mjs && node --check lib/service.mjs && node --check lib/session.mjs && node --check lib/websocket.mjs",
+    "check:versions": "node -e \"const {readFileSync}=require('node:fs'); const v=require('./package.json').version; const m=readFileSync('herdr-plugin.toml','utf8').match(/^version = \\\"(.+)\\\"$/m); if(!m||m[1]!==v){console.error('herdr-plugin.toml version '+(m?m[1]:'<missing>')+' != package.json '+v); process.exit(1);}\"",
     "test": "node --test test/*.test.mjs",
     "prepublishOnly": "npm run check && npm test"
   }

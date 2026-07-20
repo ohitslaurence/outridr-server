@@ -11,9 +11,6 @@ Please use [GitHub private vulnerability reporting](https://github.com/ohitslaur
 (Security tab → "Report a vulnerability") so the report and any fix can be
 coordinated privately before disclosure.
 
-<!-- TODO(owner): add a maintainer contact email here if you want a
-     reporting path that doesn't require a GitHub account. -->
-
 Do not open a public issue for a suspected vulnerability.
 
 ## Threat model

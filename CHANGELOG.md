@@ -3,6 +3,19 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.2] - 2026-07-20
+
+### Fixed
+
+- The Origin and Host (DNS-rebinding) checks on the HTTP and WebSocket
+  surfaces are now enforced only on **tokenless** servers. They are
+  browser-drive-by defenses that a configured `token` already supersedes
+  (an unauthorized page can't present the secret), and enforcing them with a
+  token set wrongly rejected the real app — a React Native client whose
+  WebSocket sends an `Origin` header and which addresses the machine by its
+  short MagicDNS hostname (not an IP or `*.ts.net` FQDN). Tokenless servers
+  keep the full protection. Fixes the app hanging on connect.
+
 ## [0.5.1] - 2026-07-20
 
 ### Changed

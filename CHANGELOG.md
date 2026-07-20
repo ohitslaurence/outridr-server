@@ -3,6 +3,15 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.3] - 2026-07-20
+
+### Changed
+
+- Repo discovery (`GET /repos`) now lists only standalone repositories (a
+  `.git` directory). Linked worktrees and submodule checkouts (whose `.git`
+  is a gitfile) are excluded — they're workspace artifacts, not repos to
+  start new tasks from.
+
 ## [0.5.2] - 2026-07-20
 
 ### Fixed

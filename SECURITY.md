@@ -22,6 +22,14 @@ socket API it proxies has no auth of its own, and outridr's optional shared
 `token` is defense-in-depth on top of the tailnet boundary, not a
 replacement for it.
 
+Browser-drive-by hardening (Origin rejection and a Host/DNS-rebinding
+allowlist on the HTTP and WebSocket surfaces) is enforced **only when no
+token is configured** — that is the case where a hostile web page on a
+tailnet device is a real threat. With a token set, those checks are
+redundant (an unauthorized page can't present the secret) and would
+otherwise reject legitimate native clients, so they are skipped in favor of
+the token. Set a token.
+
 Specific consequences worth knowing before you deploy:
 
 - **Without a configured `token`, every endpoint is open to any tailnet

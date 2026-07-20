@@ -90,7 +90,7 @@ test("auth on upgrade — rejected without token, accepted with query token", as
   assert.equal(authorized.statusCode, 101);
 });
 
-test("upgrade with an Origin header — rejected 403 (browsers send Origin, the native app never does)", async (t) => {
+test("tokenless server: upgrade with an Origin header — rejected 403 (browser drive-by defense)", async (t) => {
   const { server, port } = await startTestServer();
   t.after(() => server.close());
 
@@ -102,7 +102,27 @@ test("upgrade with an Origin header — rejected 403 (browsers send Origin, the 
   });
 });
 
-test("upgrade with a non-tailnet Host header — 421 misdirected request", async (t) => {
+test("token server: an Origin header is allowed — the native app's WS sends one; auth is the perimeter", async (t) => {
+  const { server, port } = await startTestServer({ token: "secret" });
+  t.after(() => server.close());
+
+  const client = await connectRawWs(port, "/herdr?token=secret", {
+    headers: { Origin: "http://gondor:8674" },
+  });
+  assert.equal(client.statusCode, 101);
+  client.close();
+});
+
+test("token server: a short-hostname Host is allowed — the app addresses the machine by MagicDNS name", async (t) => {
+  const { server, port } = await startTestServer({ token: "secret" });
+  t.after(() => server.close());
+
+  const client = await connectRawWs(port, "/herdr?token=secret", { headers: { Host: "gondor" } });
+  assert.equal(client.statusCode, 101);
+  client.close();
+});
+
+test("tokenless server: upgrade with a non-tailnet Host header — 421 misdirected request", async (t) => {
   const { server, port } = await startTestServer();
   t.after(() => server.close());
 

@@ -1,6 +1,6 @@
 {
   "name": "outridr",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Ride flank on your coding agents — expose a herdr machine to your tailnet for the outridr mobile app",
   "keywords": ["herdr", "claude-code", "coding-agents", "tailscale", "tailnet", "mobile", "push-notifications", "agent-monitoring"],
   "homepage": "https://github.com/ohitslaurence/outridr-server#readme",

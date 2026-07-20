@@ -34,6 +34,7 @@ below so they aren't re-audited.
 | 014  | Enforce herdr-plugin.toml version sync in CI and release | P3 | S | — | DONE (executed 2026-07-20, reviewed & approved, merged to main as `90dd0e7`) |
 | 015  | Non-Tailscale operation: bind guard (token required off-tailnet) + docs | P2 | M | — | TODO (red-teamed by 3 review agents 2026-07-20; their adopted/rejected findings are recorded in the plan's Maintenance notes) |
 | 016  | Built-in git repo discovery; remove /exec and command-based /repos | P1 | M | — | DONE (executed 2026-07-20, reviewed & merged as `0a6ec58`; 0.4.0 — breaking: /exec removed, repos.command → repos.roots. Follow-up noted: stale exec comment in lib/service.mjs:68) |
+| 017  | GET/PUT /repos/roots for app-driven onboarding | P1 | M | 016 | TODO (companion to herdr-mobile plan 019; PUT is 403 without a configured token per operator decision) |
 
 (Plan number 013 is intentionally unused: the original 012 "harden and test
 /transcribe" and 013 "document /transcribe" were withdrawn before execution on

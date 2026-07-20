@@ -28,16 +28,33 @@ setup into "run one command, scan with the app." It also fixes the "no token
 generation guidance" gap: pairing generates a cryptographically strong token
 automatically.
 
-## Design decision: zero-dependency QR (READ BEFORE STARTING)
+## Design decision: vendor the Nayuki QR encoder (READ BEFORE STARTING)
 
 This repo's defining property is **zero runtime dependencies** — it hand-rolls
 its own RFC 6455 WebSocket rather than depend on `ws` (see `lib/websocket.mjs`).
 A QR encoder must therefore be **vendored as the project's own stdlib-only
 module**, NOT added via `npm install qrcode`. Adding any dependency is a STOP
-condition. If vendoring a correct QR encoder proves too large for this plan's
-budget, STOP and report — do not reach for a package. (A minimal byte-mode QR
-encoder with error correction is ~300–500 lines of pure JS; that is the
-intended path, consistent with the WebSocket precedent.)
+condition.
+
+Do NOT write a QR encoder from scratch. **Port the Project Nayuki QR Code
+generator** (MIT, https://www.nayuki.io/page/qr-code-generator-library) — the
+same library the outridr mobile app already uses, so both sides produce
+compatible codes. Port from the **clean upstream source**, not any variant you
+may find in a sibling repo (a copy exists in the app with a `bit`→`number`
+identifier rename that makes it unreadable — do not reproduce that).
+
+Porting scope, precisely:
+- Take ONLY the pure classes: `QrCode`, `QrSegment`, and the `Ecc`/`Mode`
+  helpers. These are pure computation with no DOM/browser calls.
+- DROP the SVG/browser rendering (`toSvgString`, `window.btoa`, any UI-token
+  imports) — the server renders to a terminal, not SVG.
+- Strip TypeScript types to plain `.mjs` (this repo is JS ESM, stdlib only).
+- **Keep the Nayuki MIT copyright header verbatim** at the top of `lib/qr.mjs`.
+  The license requires the notice to travel with the code; in a zero-dep repo
+  this is also a positive provenance signal. Note in the README/SECURITY that
+  `lib/qr.mjs` is a vendored MIT library, the one piece of non-original code.
+- The only surface the renderer consumes is `QrCode.encodeText(text, Ecc.MEDIUM)`
+  → an object with `.size` and `.getModule(x, y)`.
 
 The connection URI is emitted as **text as well**, always, so the command is
 useful even where a QR can't render (piped output, screen readers): the QR is

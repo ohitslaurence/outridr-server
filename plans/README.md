@@ -36,7 +36,7 @@ below so they aren't re-audited.
 | 016  | Built-in git repo discovery; remove /exec and command-based /repos | P1 | M | — | DONE (executed 2026-07-20, reviewed & merged as `0a6ec58`; 0.4.0 — breaking: /exec removed, repos.command → repos.roots. Follow-up noted: stale exec comment in lib/service.mjs:68) |
 | 017  | GET/PUT /repos/roots for app-driven onboarding | P1 | M | 016 | DONE (executed 2026-07-20, reviewed & merged; PUT 403s without a configured token; saveRepoRoots lives in new lib/config-write.mjs) |
 | 018  | Request-surface hardening (Origin/Host validation, /repos/roots crash fix, readBody 413, resource caps, ?token= scoping) | P1 | M | 015 (merge order) | TODO (from a cold-context security audit 2026-07-20) |
-| 019  | Trust signals (SECURITY.md, SHA-pin workflows, GitHub Releases + CHANGELOG, doc-rot fixes) | P2 | S–M | — | TODO (from the security audit 2026-07-20; also lists operator-only handoff actions) |
+| 019  | Trust signals (SECURITY.md, SHA-pin workflows, GitHub Releases + CHANGELOG, doc-rot fixes) | P2 | S–M | — | DONE (executed & reviewed 2026-07-20, merged to main as `50e5d65`; plan text wrongly listed a pnpm action — repo is npm-only, executor correctly skipped it. Operator handoff below.) |
 | 020  | macOS Tailscale binary discovery + README onboarding/prerequisites | P2 | S–M | — | TODO (from the setup-simulation audit 2026-07-20; coordinate merge with 015, same file region) |
 | 021  | `outridr pair`: generate token + show QR for the app (vendored zero-dep QR encoder) | P2 | M | — | TODO (operator idea 2026-07-20; QR encoder vendored, not a dependency) |
 
@@ -44,6 +44,14 @@ below so they aren't re-audited.
 /transcribe" and 013 "document /transcribe" were withdrawn before execution on
 2026-07-20 — the operator confirmed the app now calls Groq directly, so the
 endpoint is dead code and the current 012 removes it instead.)
+
+## Operator handoff (from plan 019 — dashboard/CLI actions, not code)
+
+- Enable branch protection / a ruleset on `main` requiring CI (free, observable trust signal).
+- Enable CodeQL default setup (Security → Code scanning).
+- Sign annotated tags going forward: `git tag -s vX.Y.Z` (commits are already GPG-signed; tags aren't).
+- `npm deprecate outridr@0.2.0 "pre-provenance build; use >=0.3.0"` to nudge onto attested builds.
+- `SECURITY.md` has a `TODO(owner)` for an optional maintainer contact email; leave it or fill it.
 
 ## Watch items
 

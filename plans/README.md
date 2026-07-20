@@ -38,7 +38,7 @@ below so they aren't re-audited.
 | 018  | Request-surface hardening (Origin/Host validation, /repos/roots crash fix, readBody 413, resource caps, ?token= scoping) | P1 | M | — | DONE (executed & reviewed 2026-07-20, merged to main as `0f62a5f`; review caught a hostAllowed all-hex-domain bypass — fixed with net.isIP + regression test; 90 tests) |
 | 019  | Trust signals (SECURITY.md, SHA-pin workflows, GitHub Releases + CHANGELOG, doc-rot fixes) | P2 | S–M | — | DONE (executed & reviewed 2026-07-20, merged to main as `50e5d65`; plan text wrongly listed a pnpm action — repo is npm-only, executor correctly skipped it. Operator handoff below.) |
 | 020  | macOS Tailscale binary discovery + README onboarding/prerequisites | P2 | S–M | — | DONE (executed & reviewed 2026-07-20, merged to main as the 020 merge; validated on a real Mac with Tailscale.app installed; OUTRIDR_TAILSCALE_BIN override added; 97 tests) |
-| 021  | `outridr pair`: generate token + show QR for the app (vendored zero-dep QR encoder) | P2 | M | — | TODO (operator idea 2026-07-20; QR encoder vendored, not a dependency) |
+| 021  | `outridr pair`: generate token + show QR for the app (vendored Nayuki QR encoder) | P2 | M | — | DONE (executed & reviewed 2026-07-20, merged to main; no dependency added, MIT header preserved, jsQR round-trip verified; 107 tests). App side must implement the `outridr://host:port?token=` parser. |
 
 (Plan number 013 is intentionally unused: the original 012 "harden and test
 /transcribe" and 013 "document /transcribe" were withdrawn before execution on

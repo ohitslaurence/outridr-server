@@ -40,6 +40,9 @@ below so they aren't re-audited.
 | 020  | macOS Tailscale binary discovery + README onboarding/prerequisites | P2 | S–M | — | DONE (executed & reviewed 2026-07-20, merged to main as the 020 merge; validated on a real Mac with Tailscale.app installed; OUTRIDR_TAILSCALE_BIN override added; 97 tests) |
 | 021  | `outridr pair`: generate token + show QR for the app (vendored Nayuki QR encoder) | P2 | M | — | DONE (executed & reviewed 2026-07-20, merged to main; no dependency added, MIT header preserved, jsQR round-trip verified; 107 tests). App side must implement the `outridr://host:port?token=` parser. |
 | 022  | WS connection cap + idle timeout, startup rejection handling, `outridr config` token masking | P2 | M | — | DONE (executed & reviewed 2026-07-20; landed via PR under branch protection; exactly-once decrement verified, startup rejection test induced; 112 tests). Residual items from a fresh cold security re-audit whose other findings were already closed by 015/018/019. |
+| 023  | `outridr install` puts the CLI on PATH via a pinned launcher (~/.local/bin, decoupled from fnm/nvm) | P2 | S–M | — | DONE (executed & reviewed 2026-07-20; safe removal guarded by a marker; no shell rc edits; 115 tests). Bundled into the 0.5.1 release. |
+
+Also in 0.5.1 (small fixes, no separate plan): `outridr pair` now emits the app's `outridr://pair?v=1&host=…&port=…&token=…` deep-link contract and prefers the stable MagicDNS name over the raw IP (falling back to the IP). Merged via PR under branch protection.
 
 (Plan number 013 is intentionally unused: the original 012 "harden and test
 /transcribe" and 013 "document /transcribe" were withdrawn before execution on

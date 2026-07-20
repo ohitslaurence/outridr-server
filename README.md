@@ -86,9 +86,12 @@ The URI has the shape:
 outridr://pair?v=1&host=<host>&port=<port>&token=<token>
 ```
 
-`v` is the pairing-payload version so the format can evolve compatibly. This
-is a contract with the app's deep-link/QR parser — if it ever changes, both
-sides need to change together.
+`v` is the pairing-payload version so the format can evolve compatibly. When
+bound to Tailscale (`host: "tailscale"`), `host` is this machine's stable
+MagicDNS name (e.g. `machine.tailnet.ts.net`) rather than its raw IP, so a
+pairing keeps working even if the Tailscale IP later changes; it falls back
+to the IP if MagicDNS is unavailable. This is a contract with the app's
+deep-link/QR parser — if it ever changes, both sides need to change together.
 
 **Treat the QR and the URI like a password.** Anyone who has it can connect
 to this outridr instance with your token. `pair` never prints the token by

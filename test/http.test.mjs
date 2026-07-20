@@ -11,6 +11,7 @@ import {
   getJson,
   makeTmpDir,
   postJson,
+  putJson,
   startFakeHerdr,
   startTestServer,
 } from "./helpers.mjs";
@@ -248,6 +249,128 @@ test("GET /repos — configured roots: scans and serves discovered repos", async
       { alias: "b", path: join(root, "b") },
     ],
   });
+});
+
+test("GET /repos/roots — unconfigured -> empty array", async (t) => {
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+  const { status, body } = await getJson(`http://127.0.0.1:${port}/repos/roots`);
+  assert.equal(status, 200);
+  assert.deepEqual(body, { roots: [] });
+});
+
+test("GET /repos/roots — configured roots: returns the expanded roots", async (t) => {
+  const root = makeTmpDir("outridr-repos-roots");
+  const { server, port } = await startTestServer({ repos: { roots: [root], depth: 2 } });
+  t.after(() => server.close());
+  const { status, body } = await getJson(`http://127.0.0.1:${port}/repos/roots`);
+  assert.equal(status, 200);
+  assert.deepEqual(body, { roots: [root] });
+});
+
+test("PUT /repos/roots — tokenless server -> 403, config file untouched", async (t) => {
+  const seeded = JSON.stringify({ token: null, custom: "keep-me" });
+  writeFileSync(process.env.OUTRIDR_CONFIG, seeded);
+
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const { status, body } = await putJson(`http://127.0.0.1:${port}/repos/roots`, {
+    roots: [makeTmpDir("outridr-repos-403")],
+  });
+  assert.equal(status, 403);
+  assert.deepEqual(body, {
+    error: "config-token-required",
+    message:
+      "Set a token in ~/.config/outridr/config.json (or OUTRIDR_TOKEN) to allow remote config changes",
+  });
+
+  assert.equal(readFileSync(process.env.OUTRIDR_CONFIG, "utf8"), seeded);
+});
+
+test("PUT /repos/roots — configured token + valid roots: writes config, invalidates cache, returns scan", async (t) => {
+  writeFileSync(process.env.OUTRIDR_CONFIG, JSON.stringify({ token: "secret" }));
+  const root = makeTmpDir("outridr-repos-put");
+  mkdirSync(join(root, "planted", ".git"), { recursive: true });
+
+  const { server, port } = await startTestServer({ token: "secret" });
+  t.after(() => server.close());
+
+  const { status, body } = await putJson(
+    `http://127.0.0.1:${port}/repos/roots`,
+    { roots: [root] },
+    { authorization: "Bearer secret" },
+  );
+  assert.equal(status, 200);
+  assert.deepEqual(body, {
+    roots: [root],
+    repos: [{ alias: "planted", path: join(root, "planted") }],
+  });
+
+  const fileContents = JSON.parse(readFileSync(process.env.OUTRIDR_CONFIG, "utf8"));
+  assert.deepEqual(fileContents.repos.roots, [root]);
+
+  const getResult = await getJson(`http://127.0.0.1:${port}/repos`, {
+    authorization: "Bearer secret",
+  });
+  assert.equal(getResult.status, 200);
+  assert.deepEqual(getResult.body, {
+    repos: [{ alias: "planted", path: join(root, "planted") }],
+  });
+});
+
+test("PUT /repos/roots — entry not an existing directory -> 400 naming it, config file untouched", async (t) => {
+  const seeded = JSON.stringify({ token: "secret" });
+  writeFileSync(process.env.OUTRIDR_CONFIG, seeded);
+
+  const { server, port } = await startTestServer({ token: "secret" });
+  t.after(() => server.close());
+
+  const badPath = join(makeTmpDir("outridr-repos-missing"), "does-not-exist");
+  const { status, body } = await putJson(
+    `http://127.0.0.1:${port}/repos/roots`,
+    { roots: [badPath] },
+    { authorization: "Bearer secret" },
+  );
+  assert.equal(status, 400);
+  assert.equal(body.error, "invalid-roots");
+  assert.ok(body.message.includes(badPath), "message should name the failing entry");
+
+  assert.equal(readFileSync(process.env.OUTRIDR_CONFIG, "utf8"), seeded);
+});
+
+test("PUT /repos/roots — preserves unrelated config keys (including token)", async (t) => {
+  const root = makeTmpDir("outridr-repos-preserve");
+  mkdirSync(join(root, "planted", ".git"), { recursive: true });
+  writeFileSync(process.env.OUTRIDR_CONFIG, JSON.stringify({ token: "secret", custom: { keep: true } }));
+
+  const { server, port } = await startTestServer({ token: "secret" });
+  t.after(() => server.close());
+
+  const { status } = await putJson(
+    `http://127.0.0.1:${port}/repos/roots`,
+    { roots: [root] },
+    { authorization: "Bearer secret" },
+  );
+  assert.equal(status, 200);
+
+  const fileContents = JSON.parse(readFileSync(process.env.OUTRIDR_CONFIG, "utf8"));
+  assert.equal(fileContents.token, "secret");
+  assert.deepEqual(fileContents.custom, { keep: true });
+  assert.deepEqual(fileContents.repos.roots, [root]);
+});
+
+test("PUT /repos/roots — wrong bearer token -> 401", async (t) => {
+  writeFileSync(process.env.OUTRIDR_CONFIG, JSON.stringify({ token: "secret" }));
+  const { server, port } = await startTestServer({ token: "secret" });
+  t.after(() => server.close());
+
+  const { status } = await putJson(
+    `http://127.0.0.1:${port}/repos/roots`,
+    { roots: [makeTmpDir("outridr-repos-401")] },
+    { authorization: "Bearer nope" },
+  );
+  assert.equal(status, 401);
 });
 
 test("unknown route -> 404", async (t) => {

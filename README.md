@@ -83,8 +83,11 @@ HTTP/WS request handling, in the same process.
 | `POST /push/unregister` | Remove a previously registered push token. |
 | `GET /health` | Liveness probe (pings herdr through its socket). |
 | `GET /repos` † | Built-in scan of your configured root folders for git repos. |
+| `GET /repos/roots` | The configured `repos.roots` (empty array if unset). |
+| `PUT /repos/roots` ‡ | Set `repos.roots` remotely, for the app's onboarding flow. |
 
 † Opt-in via config, disabled by default.
+‡ Requires a configured token — see "Remote configuration" below.
 
 ## Configuration
 
@@ -122,6 +125,19 @@ Everything is optional. `~/.config/outridr/config.json`:
   into a repo it already found.
 - `push`: `notifyOn` is the set of `agent_status` values that trigger a push;
   `pollMs` is the agent-status poll interval.
+
+### Remote configuration
+
+`GET /repos/roots` follows normal auth like every other read — open if you
+haven't set a token, gated by it if you have. `PUT /repos/roots` (used by the
+app's onboarding flow to configure and live-preview scan roots from the
+phone) additionally requires a configured token: a tokenless server refuses
+the write with `403 { error: "config-token-required" }` even if the request
+would otherwise pass auth, because a tokenless deployment has no way to
+distinguish "the app" from "anyone on the tailnet" and letting either rewrite
+server config would be a bigger blast radius than the read-only endpoints.
+Set a token to enable it. `depth` is not settable remotely — it's file-only
+tuning.
 
 ### Migrating from 0.3.x
 
@@ -211,6 +227,7 @@ Module layout:
 - `lib/http-util.mjs` — shared token auth and request/response helpers
 - `lib/service.mjs` — systemd/launchd service install
 - `lib/config.mjs` — config file + env override loading
+- `lib/config-write.mjs` — validated, atomic config writes (`repos.roots`)
 
 See [`plans/`](plans/) for the project's engineering record — every
 non-trivial change here started as a written plan.

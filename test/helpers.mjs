@@ -6,8 +6,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // MUST run before importing lib/server.mjs anywhere in the test process —
-// STATE_DIR is captured at module-load time in lib/config.mjs.
+// STATE_DIR and CONFIG_PATH are captured at module-load time in
+// lib/config.mjs. Tests that assert on config-file writes (PUT /repos/roots)
+// read/write this same path directly via process.env.OUTRIDR_CONFIG.
 process.env.OUTRIDR_STATE_DIR = mkdtempSync(join(tmpdir(), "outridr-state-"));
+process.env.OUTRIDR_CONFIG = join(mkdtempSync(join(tmpdir(), "outridr-config-")), "config.json");
 
 export function makeTmpDir(prefix) {
   return mkdtempSync(join(tmpdir(), `${prefix}-`));
@@ -184,6 +187,17 @@ export async function postJson(url, payload, headers = {}) {
   return toResult(
     await fetch(url, {
       method: "POST",
+      headers: { "content-type": "application/json", ...headers },
+      body,
+    }),
+  );
+}
+
+export async function putJson(url, payload, headers = {}) {
+  const body = typeof payload === "string" ? payload : JSON.stringify(payload);
+  return toResult(
+    await fetch(url, {
+      method: "PUT",
       headers: { "content-type": "application/json", ...headers },
       body,
     }),

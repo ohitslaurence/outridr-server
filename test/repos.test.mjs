@@ -15,17 +15,14 @@ function makeGitFile(repoDir) {
   writeFileSync(join(repoDir, ".git"), "gitdir: ../.git/worktrees/x\n");
 }
 
-test("scanRepos: finds a directory-.git repo and a gitfile repo", async () => {
+test("scanRepos: excludes linked worktrees and submodule checkouts (gitfile .git)", async () => {
   const root = makeTmpDir("outridr-repos-basic");
   makeGitDir(join(root, "a"));
   makeGitFile(join(root, "b"));
 
   const repos = await scanRepos([root]);
 
-  assert.deepEqual(repos, [
-    { alias: "a", path: join(root, "a") },
-    { alias: "b", path: join(root, "b") },
-  ]);
+  assert.deepEqual(repos, [{ alias: "a", path: join(root, "a") }]);
 });
 
 test("scanRepos: respects depth", async () => {

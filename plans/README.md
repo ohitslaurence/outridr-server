@@ -32,9 +32,13 @@ below so they aren't re-audited.
 | 011  | Version in /health + tag-triggered npm publish with provenance | P3 | S | 010 | DONE (executed 2026-07-17, reviewed & merged to main as `e4127eb`; needs `NPM_TOKEN` repo secret before the next tag push) |
 | 012  | Remove the /transcribe endpoint and all Groq code | P1 | S | — | DONE (executed 2026-07-20, reviewed & approved, merged to main as `04dcae1`) |
 | 014  | Enforce herdr-plugin.toml version sync in CI and release | P3 | S | — | DONE (executed 2026-07-20, reviewed & approved, merged to main as `90dd0e7`) |
-| 015  | Non-Tailscale operation: bind guard (token required off-tailnet) + docs | P2 | M | — | TODO (red-teamed by 3 review agents 2026-07-20; their adopted/rejected findings are recorded in the plan's Maintenance notes) |
+| 015  | Non-Tailscale operation: bind guard (token required off-tailnet) + docs | P2 | M | — | TODO (red-teamed by 3 review agents 2026-07-20; re-reconciled to v0.4.1 line anchors/test counts same day) |
 | 016  | Built-in git repo discovery; remove /exec and command-based /repos | P1 | M | — | DONE (executed 2026-07-20, reviewed & merged as `0a6ec58`; 0.4.0 — breaking: /exec removed, repos.command → repos.roots. Follow-up noted: stale exec comment in lib/service.mjs:68) |
 | 017  | GET/PUT /repos/roots for app-driven onboarding | P1 | M | 016 | DONE (executed 2026-07-20, reviewed & merged; PUT 403s without a configured token; saveRepoRoots lives in new lib/config-write.mjs) |
+| 018  | Request-surface hardening (Origin/Host validation, /repos/roots crash fix, readBody 413, resource caps, ?token= scoping) | P1 | M | 015 (merge order) | TODO (from a cold-context security audit 2026-07-20) |
+| 019  | Trust signals (SECURITY.md, SHA-pin workflows, GitHub Releases + CHANGELOG, doc-rot fixes) | P2 | S–M | — | TODO (from the security audit 2026-07-20; also lists operator-only handoff actions) |
+| 020  | macOS Tailscale binary discovery + README onboarding/prerequisites | P2 | S–M | — | TODO (from the setup-simulation audit 2026-07-20; coordinate merge with 015, same file region) |
+| 021  | `outridr pair`: generate token + show QR for the app (vendored zero-dep QR encoder) | P2 | M | — | TODO (operator idea 2026-07-20; QR encoder vendored, not a dependency) |
 
 (Plan number 013 is intentionally unused: the original 012 "harden and test
 /transcribe" and 013 "document /transcribe" were withdrawn before execution on

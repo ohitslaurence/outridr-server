@@ -7,7 +7,7 @@
 > in `plans/README.md` — unless a reviewer dispatched you and told you they
 > maintain the index.
 >
-> **Drift check (run first)**: `git diff --stat e704a60..HEAD -- lib/server.mjs lib/config.mjs README.md test/host.test.mjs test/config.test.mjs`
+> **Drift check (run first)**: `git diff --stat 3488f44..HEAD -- lib/server.mjs lib/config.mjs README.md test/host.test.mjs test/config.test.mjs`
 > If any in-scope file changed since this plan was written, compare the
 > "Current state" excerpts against the live code before proceeding; on a
 > mismatch, treat it as a STOP condition.
@@ -19,9 +19,10 @@
 - **Risk**: MED (deliberate behavior change for some existing deployment shapes — see Maintenance notes)
 - **Depends on**: none
 - **Category**: security + docs
-- **Planned at**: commit `e704a60`, 2026-07-20 (revised same day after a
-  three-agent red-team review; the loopback check, env opt-out, and README
-  wording below already incorporate that review's findings)
+- **Planned at**: commit `3488f44` (v0.4.1), 2026-07-20 (revised same day after
+  a three-agent red-team review — the loopback check, env opt-out, and README
+  wording below incorporate that review's findings — and re-reconciled after
+  plans 016/017 landed: line anchors and test counts updated to v0.4.1)
 
 ## Why this matters
 
@@ -39,7 +40,7 @@ goal: people without a tailnet can use this — safely.
 ## Current state
 
 - `lib/server.mjs` — startup + routing. `startServer` resolves the host, then
-  listens with no safety check between (lines 58–70):
+  listens with no safety check between (lines 65–77):
 
   ```js
     resolveHost(config.host).then((host) => {
@@ -47,7 +48,7 @@ goal: people without a tailnet can use this — safely.
         console.log(`outridr listening on ${host}:${config.port} → ${config.herdrSocket}`);
   ```
 
-  `resolveHost` (lines 102–128) returns `configured` unchanged unless it is
+  `resolveHost` (lines 109–135) returns `configured` unchanged unless it is
   the literal string `"tailscale"`, in which case it shells out to
   `tailscale ip -4`. So at the `.then`, `config.host === "tailscale"` is the
   only marker distinguishing a tailnet bind from a literal one. Note the
@@ -55,7 +56,7 @@ goal: people without a tailnet can use this — safely.
   exiting) would become an unhandled rejection — the guard below therefore
   handles non-string hosts itself instead of assuming `host` is a string.
 
-- `lib/config.mjs` — `loadConfig` returns (lines 48–50):
+- `lib/config.mjs` — `loadConfig` returns (lines 58–61):
 
   ```js
     return {
@@ -87,7 +88,7 @@ goal: people without a tailnet can use this — safely.
   changes are needed): every `startTestServer` call goes through `makeConfig`
   (`test/helpers.mjs:16-32`, base `host: "127.0.0.1"` — loopback);
   `test/host.test.mjs` children use `host: "tailscale"`; and one direct
-  `startServer` subprocess at `test/http.test.mjs:310-333` (EADDRINUSE test)
+  `startServer` subprocess at `test/http.test.mjs:383-405` (EADDRINUSE test)
   uses `host: "127.0.0.1"`, `token: null` — loopback-exempt.
 
 - `test/config.test.mjs` — subprocess-based `loadConfig` tests:
@@ -99,7 +100,7 @@ Repo conventions that apply:
 - Zero dependencies, plain `.mjs` ESM, `node:test`.
 - Fail-fast startup errors: `console.error("outridr: ...")` then
   `process.exit(1)` — see `resolveHost`'s ENOENT branch
-  (`lib/server.mjs:116-119`) for the voice and shape to match.
+  (`lib/server.mjs:122-126`) for the voice and shape to match.
 - Config keys: file key, env override where operationally needed; booleans
   normalized strictly (`push.enabled !== false` pattern at
   `lib/config.mjs:75`).
@@ -112,7 +113,7 @@ Repo conventions that apply:
 |---------|---------|---------------------|
 | Syntax check | `npm run check` | exit 0 |
 | Version sync | `npm run check:versions` | exit 0 |
-| Full tests | `npm test` | all pass (73 at planning time) |
+| Full tests | `npm test` | all pass (83 at planning time) |
 | One file | `node --test test/host.test.mjs` | all pass |
 
 No install step — the project has zero dependencies.
@@ -324,14 +325,14 @@ pass.
 Steps 3–4 are the test plan (5 new subprocess tests in `test/host.test.mjs`
 modeled on the existing exit-code tests at lines 116–132, plus 1 in
 `test/config.test.mjs`). Full-suite gate: `npm test` → 0 failures, total
-count = planning-time 73 + 6 = 79.
+count = planning-time 83 + 6 = 89.
 
 ## Done criteria
 
 Machine-checkable. ALL must hold:
 
 - [ ] `npm run check` and `npm run check:versions` exit 0
-- [ ] `npm test` exits 0 with 79 passing tests
+- [ ] `npm test` exits 0 with 89 passing tests
 - [ ] `node -e "process.exit(require('node:fs').readFileSync('lib/server.mjs','utf8').includes('assertBindAllowed') ? 0 : 1)"` → exit 0
 - [ ] `grep -c "insecureNoToken" lib/config.mjs` → 2 (docblock line + property line)
 - [ ] `grep -c "Running without Tailscale" README.md` → 3

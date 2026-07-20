@@ -9,14 +9,14 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 22
       # Publishing uses npm trusted publishing (GitHub OIDC) — no token, no
       # registry-url/.npmrc auth config. Requires npm >= 11.5.1, newer than
       # what node 22 bundles.
-      - run: npm install -g npm@latest
+      - run: npm install -g npm@11.5.1
       - name: Tag must match package.json version
         run: node -e "const v=require('./package.json').version; const t=process.env.GITHUB_REF_NAME; if (t !== 'v'+v) { console.error('tag '+t+' != package version '+v); process.exit(1); }"
       - run: npm run check:versions

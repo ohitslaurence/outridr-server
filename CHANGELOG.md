@@ -3,6 +3,26 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.1] - 2026-07-20
+
+### Changed
+
+- `outridr pair` now emits the app's deep-link contract
+  `outridr://pair?v=1&host=<host>&port=<port>&token=<token>` (was
+  `outridr://<host>:<port>?token=<token>`). Scanned QR codes from earlier
+  builds won't pair; re-run `outridr pair`.
+- When bound to Tailscale, the pairing `host` is this machine's stable
+  MagicDNS name rather than its raw IP (falling back to the IP if MagicDNS
+  is unavailable), so a pairing survives a Tailscale IP change.
+
+### Added
+
+- `outridr install` places the `outridr` CLI on your PATH at
+  `~/.local/bin/outridr` — a small launcher pinned to the Node that ran the
+  install, so the command resolves from any directory regardless of a Node
+  version manager's active version. `outridr uninstall` removes it.
+  Override the location with `OUTRIDR_BIN_DIR`.
+
 ## [0.5.0] - 2026-07-20
 
 Security-hardening and onboarding release, from four independent

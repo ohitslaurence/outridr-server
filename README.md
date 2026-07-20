@@ -66,6 +66,41 @@ curl "http://$(/Applications/Tailscale.app/Contents/MacOS/Tailscale ip -4):8674/
 
 Then point the outridr app at this machine's tailnet hostname. Done.
 
+## Connecting the app
+
+```sh
+outridr pair
+```
+
+`pair` ensures a strong token exists (generating and saving one the first
+time, and reusing it on every later run — it never overwrites an existing
+token), resolves the configured host to a concrete address, and prints a
+scannable QR code plus the same connection URI as plain text (so it's still
+useful when piped, over SSH, or read by a screen reader). Scan the QR with
+the outridr app, or paste the URI in — either way, that's the whole pairing
+flow.
+
+The URI has the shape:
+
+```
+outridr://<host>:<port>?token=<token>
+```
+
+This is a contract with the app's deep-link/QR parser — if it ever changes,
+both sides need to change together.
+
+**Treat the QR and the URI like a password.** Anyone who has it can connect
+to this outridr instance with your token. `pair` never prints the token by
+itself outside the URI; don't screenshot or share the QR outside a trusted
+pairing.
+
+The QR code is rendered by a small vendored copy of the [Project Nayuki QR
+Code generator](https://www.nayuki.io/page/qr-code-generator-library) (MIT
+licensed) at `lib/qr.mjs` — the one piece of code in this repo that isn't
+original, kept to preserve this project's zero-runtime-dependency design (see
+"Design" above). Its MIT copyright header is kept verbatim at the top of the
+file.
+
 ## How it works
 
 ```mermaid
@@ -256,6 +291,7 @@ outridr install      Install + start as a user service (systemd/launchd + linger
 outridr uninstall    Stop and remove the service
 outridr status       Service status
 outridr config       Print resolved configuration
+outridr pair         Generate a token (if needed) and print a QR + URI for the app
 ```
 
 `outridr install` writes a systemd user unit (Linux, plus `loginctl
@@ -295,7 +331,9 @@ Module layout:
 - `lib/http-util.mjs` — shared token auth and request/response helpers
 - `lib/service.mjs` — systemd/launchd service install
 - `lib/config.mjs` — config file + env override loading
-- `lib/config-write.mjs` — validated, atomic config writes (`repos.roots`)
+- `lib/config-write.mjs` — validated, atomic config writes (`repos.roots`, `token`)
+- `lib/pair.mjs` — `outridr pair`: token + host resolution + connection URI
+- `lib/qr.mjs` — vendored MIT QR encoder ([Project Nayuki](https://www.nayuki.io/page/qr-code-generator-library)) + terminal renderer
 
 ### How this project is developed
 

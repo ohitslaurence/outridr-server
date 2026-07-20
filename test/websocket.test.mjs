@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { connect as netConnect } from "node:net";
 import { test } from "node:test";
 
 import { connectRawWs, encodeMaskedFrame, startFakeHerdr, startTestServer } from "./helpers.mjs";
@@ -12,6 +13,32 @@ function expectedAccept(key) {
 
 function frameJson(frame) {
   return JSON.parse(frame.payload.toString("utf8").trim());
+}
+
+/**
+ * Sends a hand-built upgrade request with exactly the given header lines
+ * (no default Host, unlike connectRawWs) and resolves with the response
+ * status line. Used only to set a single, non-duplicated Host header —
+ * connectRawWs always sends its own `Host: 127.0.0.1` first, and Node's
+ * HTTP parser keeps the first of two duplicate Host headers, so appending
+ * a second one there wouldn't actually exercise the rejection.
+ */
+function rawUpgradeStatus(port, path, headerLines) {
+  return new Promise((resolve, reject) => {
+    const socket = netConnect(port, "127.0.0.1");
+    let buffer = "";
+    socket.on("connect", () => {
+      socket.write([`GET ${path} HTTP/1.1`, ...headerLines, "", ""].join("\r\n"));
+    });
+    socket.on("data", (data) => {
+      buffer += data.toString("utf8");
+      const statusLine = buffer.split("\r\n")[0];
+      if (statusLine.includes(" ")) {
+        resolve({ statusCode: Number.parseInt(statusLine.split(" ")[1], 10), socket });
+      }
+    });
+    socket.on("error", reject);
+  });
 }
 
 test("handshake — 101 with correct Sec-WebSocket-Accept", async (t) => {
@@ -39,6 +66,33 @@ test("auth on upgrade — rejected without token, accepted with query token", as
   const authorized = await connectRawWs(port, "/herdr?token=secret");
   t.after(() => authorized.close());
   assert.equal(authorized.statusCode, 101);
+});
+
+test("upgrade with an Origin header — rejected 403 (browsers send Origin, the native app never does)", async (t) => {
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const client = await connectRawWs(port, "/herdr", { headers: { Origin: "https://evil.example" } });
+  assert.equal(client.statusCode, 403);
+  await new Promise((resolve) => {
+    client.socket.once("close", resolve);
+    client.socket.once("end", resolve);
+  });
+});
+
+test("upgrade with a non-tailnet Host header — 421 misdirected request", async (t) => {
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const { statusCode, socket } = await rawUpgradeStatus(port, "/herdr", [
+    "Host: evil.example",
+    "Upgrade: websocket",
+    "Connection: Upgrade",
+    "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==",
+    "Sec-WebSocket-Version: 13",
+  ]);
+  assert.equal(statusCode, 421);
+  socket.destroy();
 });
 
 test("round trip — one request line, one response frame", async (t) => {
@@ -221,6 +275,36 @@ test("large-but-legal frame — a ~100 KiB masked text frame still round-trips",
   const frame = await client.nextFrame();
   const response = frameJson(frame);
   assert.deepEqual(response, { id: "big1", result: { ok: true } });
+});
+
+test("in-flight cap — 100 one-line requests in a single message are all answered, no protocol error", async (t) => {
+  const { server, port, config } = await startTestServer();
+  t.after(() => server.close());
+  const herdr = await startFakeHerdr(config.herdrSocket, (request) => ({
+    id: request.id,
+    result: { ok: true },
+  }));
+  t.after(() => herdr.close());
+
+  const client = await connectRawWs(port, "/herdr");
+  t.after(() => client.close());
+  assert.equal(client.statusCode, 101);
+
+  const ids = Array.from({ length: 100 }, (_, i) => `cap-${i}`);
+  const message = ids.map((id) => JSON.stringify({ id, method: "ping", params: {} })).join("\n");
+  client.sendText(message);
+
+  const received = new Map();
+  for (let i = 0; i < ids.length; i++) {
+    const frame = await client.nextFrame();
+    assert.notEqual(frame.opcode, 0x8, "the in-flight cap must not close the connection");
+    const response = frameJson(frame);
+    received.set(response.id, response);
+  }
+  assert.equal(received.size, ids.length, "every request line must eventually receive a response");
+  const busyCount = [...received.values()].filter((r) => r.error?.code === "outridr_busy").length;
+  assert.ok(busyCount > 0, "expected the in-flight cap to reject at least one of the 100 lines");
+  assert.ok(busyCount < ids.length, "expected at least some lines to be answered by the fake herdr");
 });
 
 test("unmasked frame — a valid but unmasked client frame closes 1002", async (t) => {

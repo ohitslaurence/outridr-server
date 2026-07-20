@@ -18,7 +18,7 @@ process.env.OUTRIDR_EXPO_PUSH_URL = fakeExpo.url;
 process.env.OUTRIDR_RECEIPT_CHECK_MS = "100";
 after(() => fakeExpo.close());
 
-const { chunkArray, EXPO_BATCH_LIMIT, receiptsUrl } = await import("../lib/push.mjs");
+const { chunkArray, EXPO_BATCH_LIMIT, MAX_PUSH_TOKENS, receiptsUrl } = await import("../lib/push.mjs");
 
 // Leaked-watcher note: startPushWatcher()'s poll and receipt-check timers
 // are never stopped (server.close() doesn't touch them), so every test
@@ -113,6 +113,33 @@ test("POST /push/unregister — removes a token, is idempotent for unknown token
   const again = await postJson(`http://127.0.0.1:${port}/push/unregister`, { token });
   assert.equal(again.status, 200);
   assert.deepEqual(again.body, { ok: true, registered: 0 });
+});
+
+test("PushTokenStore cap — registering one token past the cap evicts the oldest", async (t) => {
+  resetPushTokenState();
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const tokens = Array.from({ length: MAX_PUSH_TOKENS + 1 }, (_, i) => `ExponentPushToken[cap-${i}]`);
+  for (const token of tokens) {
+    const { status, body } = await postJson(`http://127.0.0.1:${port}/push/register`, {
+      token,
+      device: "phone",
+    });
+    assert.equal(status, 200);
+    assert.ok(body.registered <= MAX_PUSH_TOKENS, "count must never exceed the cap");
+  }
+
+  const persisted = readPersistedTokens();
+  assert.equal(persisted.length, MAX_PUSH_TOKENS);
+  assert.ok(
+    !persisted.some((entry) => entry.token === tokens[0]),
+    "the first-registered token should have been evicted to make room",
+  );
+  assert.ok(
+    persisted.some((entry) => entry.token === tokens[tokens.length - 1]),
+    "the most recently registered token should still be present",
+  );
 });
 
 test("push watcher — a status transition into a notify-worthy state pushes exactly once", async (t) => {

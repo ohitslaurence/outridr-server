@@ -115,8 +115,11 @@ Everything is optional. `~/.config/outridr/config.json`:
   If you run `outridr serve` in the foreground without a supervisor, know
   that it deliberately exits in both of these cases rather than serving on
   a stale or unreachable address.
-- `token`: optional bearer/`?token=` check on every request, for defense in
-  depth on top of tailnet ACLs.
+- `token`: optional shared secret, for defense in depth on top of tailnet
+  ACLs. Send it as `Authorization: Bearer <token>` on every HTTP request;
+  `?token=` is honored only on the `/herdr` WebSocket upgrade (the app can't
+  set a header there), so the secret never ends up in URLs, logs, or shell
+  history on regular HTTP endpoints.
 - `herdrSocket`: path to herdr's unix socket.
 - `repos`: absent = `/repos` disabled. When set, `roots` is a list of folders
   to scan (breadth-first, `depth` levels below each root, default `2`) for

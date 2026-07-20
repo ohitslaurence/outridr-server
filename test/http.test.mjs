@@ -133,13 +133,71 @@ test("auth — token required when configured", async (t) => {
   });
   assert.equal(bearer.status, 200);
 
+  // ?token= is scoped to the WS upgrade only (see test/websocket.test.mjs);
+  // every HTTP route now accepts the Authorization header exclusively.
   const query = await getJson(`http://127.0.0.1:${port}/health?token=secret`);
-  assert.equal(query.status, 200);
+  assert.equal(query.status, 401);
 
   const wrong = await getJson(`http://127.0.0.1:${port}/health`, {
     authorization: "Bearer nope",
   });
   assert.equal(wrong.status, 401);
+});
+
+test("request with a non-tailnet Host header — 421 misdirected request", async (t) => {
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  // fetch() (used by the getJson/postJson helpers) refuses to send a custom
+  // Host header — it always overwrites it with the actual connection
+  // authority — so this needs node:http's client, which allows it.
+  const { status } = await new Promise((resolve, reject) => {
+    const req = httpRequest(
+      { hostname: "127.0.0.1", port, path: "/health", method: "GET", headers: { host: "evil.example" } },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve({ status: res.statusCode }));
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+  assert.equal(status, 421);
+});
+
+test("request with an all-hex domain Host header — 421 (regex-vs-isIP regression)", async (t) => {
+  // dead.cafe, beef.cafe, face.cafe, etc. are registrable domains composed
+  // entirely of [0-9a-f.] characters — a naive `/^[0-9a-f:.]+$/` IP-literal
+  // check would wrongly accept them, letting a DNS-rebinding attacker
+  // register one and point its DNS at the tailnet address. hostAllowed must
+  // use node:net's isIP (real IP-literal parsing), not a character-class regex.
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const { status } = await new Promise((resolve, reject) => {
+    const req = httpRequest(
+      { hostname: "127.0.0.1", port, path: "/health", method: "GET", headers: { host: "dead.cafe" } },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve({ status: res.statusCode }));
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+  assert.equal(status, 421);
+});
+
+test("POST with a >64 KiB body — 413 body too large", async (t) => {
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const oversizedToken = `ExponentPushToken[${"x".repeat(70 * 1024)}]`;
+  const { status } = await postJson(`http://127.0.0.1:${port}/push/register`, {
+    token: oversizedToken,
+    device: "phone",
+  });
+  assert.equal(status, 413);
 });
 
 test("POST /push/register — valid token persists and increments count", async (t) => {

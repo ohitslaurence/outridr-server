@@ -18,8 +18,8 @@ notifications when an agent needs you**.
 - **Tailnet-first.** outridr binds to your Tailscale interface, not the
   public internet; your tailnet ACLs are the access-control boundary, and an
   optional shared token is a second factor on top of that.
-- **Tested.** 76 tests, run on every push and PR across Linux and macOS on
-  Node 20 and 22 (see the CI badge above).
+- **Tested.** Runs on every push and PR across Linux and macOS on Node 20
+  and 22 (see the CI badge above).
 - **MIT licensed.**
 
 ## Quick start
@@ -229,8 +229,14 @@ Module layout:
 - `lib/config.mjs` — config file + env override loading
 - `lib/config-write.mjs` — validated, atomic config writes (`repos.roots`)
 
-See [`plans/`](plans/) for the project's engineering record — every
-non-trivial change here started as a written plan.
+### How this project is developed
+
+Every non-trivial change here starts as a written plan, is executed against
+the test suite, and is human-reviewed before it merges — see
+[`plans/`](plans/) for the full engineering record, including plans that
+were rejected or deferred and why. Some of that work is done with AI coding
+agents under human direction; the plans record is kept precisely so that
+process stays auditable rather than opaque.
 
 ## License
 

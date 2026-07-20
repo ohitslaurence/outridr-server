@@ -18,7 +18,7 @@ notifications when an agent needs you**.
 - **Tailnet-first.** outridr binds to your Tailscale interface, not the
   public internet; your tailnet ACLs are the access-control boundary, and an
   optional shared token is a second factor on top of that.
-- **Tested.** 73 tests, run on every push and PR across Linux and macOS on
+- **Tested.** 76 tests, run on every push and PR across Linux and macOS on
   Node 20 and 22 (see the CI badge above).
 - **MIT licensed.**
 
@@ -82,10 +82,9 @@ HTTP/WS request handling, in the same process.
 | `POST /push/register` | Register an Expo push token. A watcher polls agent statuses and pushes when an agent transitions to `blocked`/`done`. |
 | `POST /push/unregister` | Remove a previously registered push token. |
 | `GET /health` | Liveness probe (pings herdr through its socket). |
-| `POST /exec` † | Run your configured task CLI (e.g. a worktree-task spawner). |
-| `GET /repos` † | Run your configured repo-listing command. |
+| `GET /repos` † | Built-in scan of your configured root folders for git repos. |
 
-† Opt-in via config — workflow-specific, disabled by default.
+† Opt-in via config, disabled by default.
 
 ## Configuration
 
@@ -97,8 +96,7 @@ Everything is optional. `~/.config/outridr/config.json`:
   "host": "tailscale",
   "token": "optional-shared-secret",
   "herdrSocket": "~/.config/herdr/herdr.sock",
-  "exec": { "command": "~/.local/bin/dev" },
-  "repos": { "command": ["~/.local/bin/dev", "repos", "--json"] },
+  "repos": { "roots": ["~/Development"], "depth": 2 },
   "push": { "notifyOn": ["blocked", "done"], "pollMs": 5000 }
 }
 ```
@@ -117,10 +115,22 @@ Everything is optional. `~/.config/outridr/config.json`:
 - `token`: optional bearer/`?token=` check on every request, for defense in
   depth on top of tailnet ACLs.
 - `herdrSocket`: path to herdr's unix socket.
-- `exec`/`repos`: absent = endpoints disabled. `exec` runs exactly the one
-  configured binary with client-supplied args.
+- `repos`: absent = `/repos` disabled. When set, `roots` is a list of folders
+  to scan (breadth-first, `depth` levels below each root, default `2`) for
+  git repos — any directory containing `.git` (a directory or a gitfile, so
+  linked worktrees and submodule checkouts count). Scanning does not descend
+  into a repo it already found.
 - `push`: `notifyOn` is the set of `agent_status` values that trigger a push;
   `pollMs` is the agent-status poll interval.
+
+### Migrating from 0.3.x
+
+`POST /exec` is gone — the outridr app now creates tasks through herdr's
+native `worktree.create`/`agent.start` over `/herdr` instead of shelling out
+to a configured CLI. `repos.command` (an external repo-listing command) is
+replaced by `repos.roots` (folders for outridr's built-in scanner to walk);
+update your config accordingly. Any leftover `exec` or `repos.command` key
+is ignored with a startup warning, not a hard failure.
 
 Env overrides (primary):
 
@@ -149,8 +159,9 @@ reach outridr — that's the actual perimeter. herdr's own socket has no
 auth, so the threat model is simple: anyone who can reach outridr can
 drive your agents through it. The optional `token` is a second factor on
 top of the tailnet boundary, not a replacement for it.
-`exec` and `repos` run arbitrary configured commands and are opt-in for
-exactly that reason — they're off unless you explicitly configure them.
+`repos` only reads directory names and `.git` presence under folders you
+configure — it runs no external commands — and is still opt-in: `/repos`
+is off unless you set `repos.roots`.
 Do not bind `0.0.0.0` on a machine with a public interface.
 
 ## Service management
@@ -192,6 +203,7 @@ No install step — zero dependencies means `npm test` works straight out of
 Module layout:
 
 - `lib/server.mjs` — HTTP routing and startup (host resolution, listen)
+- `lib/repos.mjs` — built-in git repo scanning + caching for `/repos`
 - `lib/session.mjs` — byte-offset transcript windowing for `/session/<id>`
 - `lib/websocket.mjs` — minimal RFC6455 server bridging the app to herdr
 - `lib/push.mjs` — Expo push token store, status watcher, and send/receipts lifecycle

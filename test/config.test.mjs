@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -62,21 +62,36 @@ test("loadConfig: env overrides win over config file", () => {
   assert.equal(config.token, "t");
 });
 
-test("loadConfig: exec absent -> null; exec.command expands ~/", () => {
+test("loadConfig: repos absent -> null; repos.roots expands ~/ and defaults depth to 2", () => {
   const missingPath = join(mkdtempSync(join(tmpdir(), "outridr-config-")), "missing.json");
-  const noExec = loadConfigInSubprocess(baseEnv({ OUTRIDR_CONFIG: missingPath }));
-  assert.equal(noExec.exec, null);
+  const noRepos = loadConfigInSubprocess(baseEnv({ OUTRIDR_CONFIG: missingPath }));
+  assert.equal(noRepos.repos, null);
 
-  const cfgPath = writeConfigFile({ exec: { command: "~/x" } });
-  const withExec = loadConfigInSubprocess(baseEnv({ OUTRIDR_CONFIG: cfgPath }));
-  assert.equal(withExec.exec.command, join(homedir(), "x"));
-  assert.ok(withExec.exec.command.startsWith("/"));
+  const cfgPath = writeConfigFile({ repos: { roots: ["~/x", "/abs/y"] } });
+  const withRepos = loadConfigInSubprocess(baseEnv({ OUTRIDR_CONFIG: cfgPath }));
+  assert.deepEqual(withRepos.repos.roots, [join(homedir(), "x"), "/abs/y"]);
+  assert.equal(withRepos.repos.depth, 2);
 });
 
-test("loadConfig: repos.command bare string -> one-element array", () => {
-  const cfgPath = writeConfigFile({ repos: { command: "~/x" } });
+test("loadConfig: repos.depth overrides the default", () => {
+  const cfgPath = writeConfigFile({ repos: { roots: ["/abs"], depth: 4 } });
   const config = loadConfigInSubprocess(baseEnv({ OUTRIDR_CONFIG: cfgPath }));
-  assert.deepEqual(config.repos.command, [join(homedir(), "x")]);
+  assert.equal(config.repos.depth, 4);
+});
+
+test("loadConfig: legacy exec/repos.command keys are ignored with a startup warning, not a crash", () => {
+  const cfgPath = writeConfigFile({ exec: { command: "~/x" }, repos: { command: ["~/x"] } });
+  const result = spawnSync(
+    process.execPath,
+    ["-e", "import('./lib/config.mjs').then(m => console.log(JSON.stringify(m.loadConfig())))"],
+    { cwd: repoRoot, encoding: "utf8", env: baseEnv({ OUTRIDR_CONFIG: cfgPath }) },
+  );
+  assert.equal(result.status, 0);
+  const config = JSON.parse(result.stdout);
+  assert.equal(config.exec, undefined);
+  assert.equal(config.repos, null);
+  assert.match(result.stderr, /"exec" was removed/);
+  assert.match(result.stderr, /"repos\.command" was removed/);
 });
 
 test("loadConfig: invalid JSON in config file -> process exits 1 with 'invalid config'", () => {

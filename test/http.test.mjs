@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { request as httpRequest } from "node:http";
 import { createServer as createNetServer } from "node:net";
 import { join } from "node:path";
@@ -218,86 +218,36 @@ test("POST /push/register — non-Expo token -> 400", async (t) => {
   assert.equal(status, 400);
 });
 
-test("POST /exec — disabled by default -> 404", async (t) => {
+test("POST /exec — removed endpoint -> 404", async (t) => {
   const { server, port } = await startTestServer();
   t.after(() => server.close());
   const { status } = await postJson(`http://127.0.0.1:${port}/exec`, { args: ["a"] });
   assert.equal(status, 404);
 });
 
-test("POST /exec — enabled: runs configured command with args", async (t) => {
-  const scriptsDir = makeTmpDir("outridr-exec");
-  const scriptPath = join(scriptsDir, "echo-args.mjs");
-  writeFileSync(scriptPath, "console.log(JSON.stringify(process.argv.slice(2)))\n");
-
-  const { server, port } = await startTestServer({ exec: { command: process.execPath } });
+test("GET /repos — disabled by default -> 404", async (t) => {
+  const { server, port } = await startTestServer();
   t.after(() => server.close());
-
-  const { status, body } = await postJson(`http://127.0.0.1:${port}/exec`, {
-    args: [scriptPath, "a", "b"],
-  });
-  assert.equal(status, 200);
-  assert.equal(body.code, 0);
-  assert.deepEqual(JSON.parse(body.stdout), ["a", "b"]);
+  const { status } = await getJson(`http://127.0.0.1:${port}/repos`);
+  assert.equal(status, 404);
 });
 
-test("POST /exec — validation: empty args -> 400", async (t) => {
-  const { server, port } = await startTestServer({ exec: { command: process.execPath } });
-  t.after(() => server.close());
-  const { status } = await postJson(`http://127.0.0.1:${port}/exec`, { args: [] });
-  assert.equal(status, 400);
-});
+test("GET /repos — configured roots: scans and serves discovered repos", async (t) => {
+  const root = makeTmpDir("outridr-repos");
+  mkdirSync(join(root, "a", ".git"), { recursive: true });
+  mkdirSync(join(root, "b", ".git"), { recursive: true });
 
-test("POST /exec — validation: too many args -> 400", async (t) => {
-  const { server, port } = await startTestServer({ exec: { command: process.execPath } });
-  t.after(() => server.close());
-  const args = Array.from({ length: 11 }, (_, i) => `arg${i}`);
-  const { status } = await postJson(`http://127.0.0.1:${port}/exec`, { args });
-  assert.equal(status, 400);
-});
-
-test("POST /exec — validation: arg too long -> 400", async (t) => {
-  const { server, port } = await startTestServer({ exec: { command: process.execPath } });
-  t.after(() => server.close());
-  const { status } = await postJson(`http://127.0.0.1:${port}/exec`, { args: ["a".repeat(200)] });
-  assert.equal(status, 400);
-});
-
-test("POST /exec — validation: non-array args -> 400", async (t) => {
-  const { server, port } = await startTestServer({ exec: { command: process.execPath } });
-  t.after(() => server.close());
-  const { status } = await postJson(`http://127.0.0.1:${port}/exec`, { args: "nope" });
-  assert.equal(status, 400);
-});
-
-test("GET /repos — well-formed output", async (t) => {
-  const scriptsDir = makeTmpDir("outridr-repos");
-  const scriptPath = join(scriptsDir, "repos.mjs");
-  writeFileSync(scriptPath, 'console.log(JSON.stringify({ repos: [{ name: "x" }] }))\n');
-
-  const { server, port } = await startTestServer({
-    repos: { command: [process.execPath, scriptPath] },
-  });
+  const { server, port } = await startTestServer({ repos: { roots: [root], depth: 2 } });
   t.after(() => server.close());
 
   const { status, body } = await getJson(`http://127.0.0.1:${port}/repos`);
   assert.equal(status, 200);
-  assert.deepEqual(body, { repos: [{ name: "x" }] });
-});
-
-test("GET /repos — garbage output -> empty repos list", async (t) => {
-  const scriptsDir = makeTmpDir("outridr-repos-bad");
-  const scriptPath = join(scriptsDir, "repos.mjs");
-  writeFileSync(scriptPath, 'console.log("not json")\n');
-
-  const { server, port } = await startTestServer({
-    repos: { command: [process.execPath, scriptPath] },
+  assert.deepEqual(body, {
+    repos: [
+      { alias: "a", path: join(root, "a") },
+      { alias: "b", path: join(root, "b") },
+    ],
   });
-  t.after(() => server.close());
-
-  const { status, body } = await getJson(`http://127.0.0.1:${port}/repos`);
-  assert.equal(status, 200);
-  assert.deepEqual(body, { repos: [] });
 });
 
 test("unknown route -> 404", async (t) => {
@@ -317,7 +267,6 @@ test("startServer — EADDRINUSE on the second listen exits 1 with a server erro
     token: null,
     herdrSocket: join(makeTmpDir("outridr-herdr"), "herdr.sock"),
     claudeProjectsDir: makeTmpDir("outridr-projects"),
-    exec: null,
     repos: null,
     push: { notifyOn: ["blocked", "done"], pollMs: 5000, enabled: false },
   };

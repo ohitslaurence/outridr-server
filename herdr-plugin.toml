@@ -1,6 +1,6 @@
 id = "outridr"
 name = "outridr"
-version = "0.3.0"
+version = "0.4.0"
 min_herdr_version = "0.7.0"
 description = "Ride flank on your coding agents — tailnet server for the outridr mobile app"
 platforms = ["linux", "macos"]

@@ -24,7 +24,22 @@ notifications when an agent needs you**.
 
 ## Quick start
 
-On the machine running herdr (with [Tailscale](https://tailscale.com) up):
+### Prerequisites
+
+- **Node.js ≥ 20** on the machine that will run outridr (`node --version`).
+- **[herdr](https://herdr.dev) installed and running.** outridr is a window
+  onto herdr — install and start herdr first. This version of outridr needs
+  herdr ≥ 0.7.0.
+- **[Tailscale](https://tailscale.com)**, signed in on this machine *and* on
+  your phone, both on the same tailnet.
+- **macOS note**: the `tailscale` CLI isn't on `PATH` by default (Tailscale.app
+  from the Mac App Store or a direct download) — it lives at
+  `/Applications/Tailscale.app/Contents/MacOS/Tailscale`. outridr's own server
+  finds it automatically (see "Configuration" below), but if you alias or
+  invoke `tailscale` yourself for the health check below, use the full path or
+  add an alias, e.g. `alias tailscale=/Applications/Tailscale.app/Contents/MacOS/Tailscale`.
+
+On the machine running herdr (with Tailscale up):
 
 ```sh
 npx outridr install     # installs + starts a user service (systemd/launchd)
@@ -37,10 +52,16 @@ herdr plugin install ohitslaurence/outridr-server
 # then run the "outridr: install service" action
 ```
 
-Check it:
+Check it — on Linux, or macOS with `tailscale` on `PATH`:
 
 ```sh
 curl "http://$(tailscale ip -4):8674/health"
+```
+
+on a stock macOS Tailscale.app install, use the full path instead:
+
+```sh
+curl "http://$(/Applications/Tailscale.app/Contents/MacOS/Tailscale ip -4):8674/health"
 ```
 
 Then point the outridr app at this machine's tailnet hostname. Done.
@@ -104,6 +125,10 @@ Everything is optional. `~/.config/outridr/config.json`:
 }
 ```
 
+Editing this file (or its env overrides) only affects a running service after
+you re-run `outridr install` — it restarts the service so the new config
+takes effect. See [Service management](#service-management) below.
+
 - `host`: a literal address, or `"tailscale"` to bind the machine's Tailscale
   IPv4 (the default — tailnet-only exposure). Resolving `"tailscale"` shells
   out to `tailscale ip -4`, retrying briefly if it fails (common right after
@@ -117,7 +142,11 @@ Everything is optional. `~/.config/outridr/config.json`:
   a stale or unreachable address. Binding a non-loopback address with `host`
   set to anything other than `"tailscale"` requires a `token`: outridr
   refuses to start otherwise (see
-  [Running without Tailscale](#running-without-tailscale)).
+  [Running without Tailscale](#running-without-tailscale)). On macOS, if the
+  `tailscale` CLI isn't on `PATH`, outridr automatically falls back to the
+  standard Tailscale.app bundle path
+  (`/Applications/Tailscale.app/Contents/MacOS/Tailscale`); override with
+  `OUTRIDR_TAILSCALE_BIN` if yours lives somewhere else.
 - `token`: optional shared secret, for defense in depth on top of tailnet
   ACLs. Send it as `Authorization: Bearer <token>` on every HTTP request;
   `?token=` is honored only on the `/herdr` WebSocket upgrade (the app can't
@@ -171,8 +200,9 @@ The rest are mostly for tuning/testing and rarely need to change:
 `~/.local/state/outridr`), `OUTRIDR_RECEIPT_CHECK_MS` (Expo receipts poll
 interval, default 900000 = 15 min), `OUTRIDR_HOST_RESOLVE_ATTEMPTS` /
 `OUTRIDR_HOST_RESOLVE_DELAY_MS` (boot-time Tailscale IP resolution retries
-and delay), and `OUTRIDR_HOST_RECHECK_MS` (running IP re-check interval,
-default 60000).
+and delay), `OUTRIDR_HOST_RECHECK_MS` (running IP re-check interval,
+default 60000), and `OUTRIDR_TAILSCALE_BIN` (path to the `tailscale` binary,
+overriding both `PATH` lookup and the macOS app-bundle fallback).
 
 ## Security model
 

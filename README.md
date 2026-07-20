@@ -240,8 +240,10 @@ and delay), `OUTRIDR_HOST_RECHECK_MS` (running IP re-check interval,
 default 60000), `OUTRIDR_TAILSCALE_BIN` (path to the `tailscale` binary,
 overriding both `PATH` lookup and the macOS app-bundle fallback),
 `OUTRIDR_WS_MAX_CONNECTIONS` (max concurrent `/herdr` WebSocket connections,
-default 32), and `OUTRIDR_WS_IDLE_MS` (idle timeout before an inactive
-WebSocket connection is closed, default 600000 = 10 min).
+default 32), `OUTRIDR_WS_IDLE_MS` (idle timeout before an inactive
+WebSocket connection is closed, default 600000 = 10 min), and
+`OUTRIDR_BIN_DIR` (where `outridr install` writes the CLI launcher, default
+`~/.local/bin`).
 
 `outridr config` masks a configured `token` by default; pass `--show-secrets`
 to print it in cleartext.
@@ -315,6 +317,15 @@ restart mechanism rebinds it to the new address.
 If you have a `dev.outridr` launchd agent from an old version of outridr
 that used `launchctl load` instead of `bootstrap`, run `outridr uninstall
 && outridr install` once to migrate it to the modern API.
+
+`outridr install` also writes a small launcher script to `~/.local/bin/outridr`
+(override with `OUTRIDR_BIN_DIR`), pinned to the same install-time `node`
+binary and entrypoint as the service unit — so `outridr pair`/`status`/etc.
+keep working from any shell, regardless of which Node version a version
+manager has active or auto-switches to in a given directory. If
+`~/.local/bin` isn't already on your `PATH`, install prints the line to add
+to your shell's rc file; it never edits one for you. `outridr uninstall`
+removes the launcher again (only if it's the one outridr wrote).
 
 ## Development
 

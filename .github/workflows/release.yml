@@ -19,6 +19,7 @@ jobs:
       - run: npm install -g npm@latest
       - name: Tag must match package.json version
         run: node -e "const v=require('./package.json').version; const t=process.env.GITHUB_REF_NAME; if (t !== 'v'+v) { console.error('tag '+t+' != package version '+v); process.exit(1); }"
+      - run: npm run check:versions
       - run: npm run check
       - run: npm test
       - run: npm publish

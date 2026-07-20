@@ -3,6 +3,45 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-07-20
+
+Security-hardening and onboarding release, from four independent
+cold-context audits (site, repo, setup simulation, and a security trust
+review).
+
+### Added
+
+- `outridr pair`: generates a strong token if none is set, then prints a
+  scannable QR code and an `outridr://<host>:<port>?token=<token>` URI for
+  the app. QR encoder is a vendored, zero-dependency port of the MIT Nayuki
+  library.
+- Automatic discovery of the macOS Tailscale.app CLI when it isn't on `PATH`
+  (overridable with `OUTRIDR_TAILSCALE_BIN`), plus a Prerequisites section
+  and non-Tailscale operation guide in the README.
+- WebSocket concurrency cap (`OUTRIDR_WS_MAX_CONNECTIONS`, default 32) and
+  idle-connection timeout (`OUTRIDR_WS_IDLE_MS`, default 10 min).
+- `SECURITY.md` with a documented threat model and disclosure policy.
+
+### Changed
+
+- **Origin and Host validation** on both HTTP and the WebSocket upgrade
+  closes browser-origin and DNS-rebinding paths into the tailnet server.
+- The shared `token` is accepted in a `?token=` query string only on the
+  `/herdr` WebSocket upgrade; every other endpoint requires the
+  `Authorization: Bearer` header.
+- `outridr config` masks the token by default (`--show-secrets` to reveal).
+- Startup failures now log and exit non-zero cleanly instead of crashing on
+  an unhandled rejection.
+
+### Security
+
+- A non-loopback bind with a literal `host` (i.e. outside Tailscale) now
+  refuses to start without a `token`, unless `insecureNoToken: true` is set
+  explicitly. **This can stop an existing tokenless non-loopback deployment
+  from starting after upgrade** — set a token or `insecureNoToken`.
+- Bounded the push-token store and per-connection herdr sockets; hardened
+  request-body handling; CI/release GitHub Actions pinned to commit SHAs.
+
 ## [0.4.1] - 2026-07-20
 
 - Added `GET`/`PUT /repos/roots` so the outridr app can read and set

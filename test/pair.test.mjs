@@ -32,9 +32,9 @@ test("pair: with host + token in env -> prints the outridr:// URI and a QR block
       OUTRIDR_TOKEN: "abc",
     }),
   );
-  assert.match(stdout, /outridr:\/\/127\.0\.0\.1:8674\?token=abc/);
+  assert.match(stdout, /outridr:\/\/pair\?v=1&host=127\.0\.0\.1&port=8674&token=abc/);
   // A QR block (rendered with half-block glyphs) appears before the URI line.
-  const uriIndex = stdout.indexOf("outridr://127.0.0.1:8674?token=abc");
+  const uriIndex = stdout.indexOf("outridr://pair?v=1&host=127.0.0.1&port=8674&token=abc");
   const qrBlock = stdout.slice(0, uriIndex);
   assert.match(qrBlock, /[█▀▄]/, "expected half-block QR glyphs above the URI");
 });
@@ -44,7 +44,7 @@ test("pair: no token configured -> generates one, persists it, and reuses it on 
   const env = baseEnv({ OUTRIDR_CONFIG: cfgPath, OUTRIDR_HOST: "127.0.0.1", OUTRIDR_PORT: "8674" });
 
   const firstStdout = runPair(env);
-  const firstMatch = firstStdout.match(/outridr:\/\/127\.0\.0\.1:8674\?token=([0-9a-f]+)/);
+  const firstMatch = firstStdout.match(/outridr:\/\/pair\?v=1&host=127\.0\.0\.1&port=8674&token=([0-9a-f]+)/);
   assert.ok(firstMatch, "expected a generated token in the URI");
   const firstToken = firstMatch[1];
   assert.equal(firstToken.length, 64, "generated token should be 64 hex characters");
@@ -53,7 +53,7 @@ test("pair: no token configured -> generates one, persists it, and reuses it on 
   assert.equal(configFile.token, firstToken);
 
   const secondStdout = runPair(env);
-  const secondMatch = secondStdout.match(/outridr:\/\/127\.0\.0\.1:8674\?token=([0-9a-f]+)/);
+  const secondMatch = secondStdout.match(/outridr:\/\/pair\?v=1&host=127\.0\.0\.1&port=8674&token=([0-9a-f]+)/);
   assert.ok(secondMatch, "expected a token in the second run's URI");
   assert.equal(secondMatch[1], firstToken, "pairing must be idempotent: same token on a second run");
 });

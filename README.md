@@ -83,11 +83,12 @@ flow.
 The URI has the shape:
 
 ```
-outridr://<host>:<port>?token=<token>
+outridr://pair?v=1&host=<host>&port=<port>&token=<token>
 ```
 
-This is a contract with the app's deep-link/QR parser — if it ever changes,
-both sides need to change together.
+`v` is the pairing-payload version so the format can evolve compatibly. This
+is a contract with the app's deep-link/QR parser — if it ever changes, both
+sides need to change together.
 
 **Treat the QR and the URI like a password.** Anyone who has it can connect
 to this outridr instance with your token. `pair` never prints the token by

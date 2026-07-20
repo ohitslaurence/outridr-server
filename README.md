@@ -114,7 +114,10 @@ Everything is optional. `~/.config/outridr/config.json`:
   to the new address — see [Service management](#service-management) below.
   If you run `outridr serve` in the foreground without a supervisor, know
   that it deliberately exits in both of these cases rather than serving on
-  a stale or unreachable address.
+  a stale or unreachable address. Binding a non-loopback address with `host`
+  set to anything other than `"tailscale"` requires a `token`: outridr
+  refuses to start otherwise (see
+  [Running without Tailscale](#running-without-tailscale)).
 - `token`: optional shared secret, for defense in depth on top of tailnet
   ACLs. Send it as `Authorization: Bearer <token>` on every HTTP request;
   `?token=` is honored only on the `/herdr` WebSocket upgrade (the app can't
@@ -181,7 +184,39 @@ top of the tailnet boundary, not a replacement for it.
 `repos` only reads directory names and `.git` presence under folders you
 configure — it runs no external commands — and is still opt-in: `/repos`
 is off unless you set `repos.roots`.
-Do not bind `0.0.0.0` on a machine with a public interface.
+Off the tailnet the perimeter disappears, so outridr enforces the second
+factor: a non-loopback bind with a literal `host` refuses to start without
+a `token` unless you explicitly set `insecureNoToken: true`.
+Binding `0.0.0.0` is only sane behind a firewall or NAT — see
+[Running without Tailscale](#running-without-tailscale).
+
+## Running without Tailscale
+
+You don't need Tailscale to use outridr: set `host` to a literal address — a
+LAN IP, a WireGuard/ZeroTier interface address, or `0.0.0.0` behind a
+firewall/NAT (normal in containers).
+
+A `token` is required for any non-loopback literal bind. Make it long and
+random (e.g. `openssl rand -hex 32`) — it's the only lock on the door out
+here. The app authenticates with `Authorization: Bearer <token>`.
+
+`?token=` also works for clients that can't set headers, but query strings
+end up in reverse-proxy and access logs — prefer the header everywhere you
+can.
+
+`insecureNoToken: true` (or env `OUTRIDR_INSECURE_NO_TOKEN=1` for
+config-file-less deployments) opts out, for interfaces that already carry
+their own auth/encryption boundary (a VPN, an isolated LAN):
+
+```json
+{ "host": "0.0.0.0", "insecureNoToken": true }
+```
+
+Traffic is plain HTTP. On a network you don't fully trust, put a
+TLS-terminating reverse proxy (e.g. Caddy) in front and keep outridr bound
+to loopback behind it. Never expose outridr directly to the public internet
+— the token gates requests, but it travels in cleartext and there is no
+rate limiting.
 
 ## Service management
 

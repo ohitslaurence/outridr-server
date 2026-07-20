@@ -108,6 +108,32 @@ test("loadConfig: invalid JSON in config file -> process exits 1 with 'invalid c
   );
 });
 
+test("loadConfig: insecureNoToken defaults false, strict boolean/env normalization", () => {
+  const missingPath = join(mkdtempSync(join(tmpdir(), "outridr-config-")), "missing.json");
+  const defaults = loadConfigInSubprocess(baseEnv({ OUTRIDR_CONFIG: missingPath }));
+  assert.equal(defaults.insecureNoToken, false);
+
+  const truePath = writeConfigFile({ insecureNoToken: true });
+  const trueConfig = loadConfigInSubprocess(baseEnv({ OUTRIDR_CONFIG: truePath }));
+  assert.equal(trueConfig.insecureNoToken, true);
+
+  const nonBooleanPath = writeConfigFile({ insecureNoToken: "yes" });
+  const nonBooleanConfig = loadConfigInSubprocess(baseEnv({ OUTRIDR_CONFIG: nonBooleanPath }));
+  assert.equal(nonBooleanConfig.insecureNoToken, false);
+
+  const envOnePath = join(mkdtempSync(join(tmpdir(), "outridr-config-")), "missing.json");
+  const envOneConfig = loadConfigInSubprocess(
+    baseEnv({ OUTRIDR_CONFIG: envOnePath, OUTRIDR_INSECURE_NO_TOKEN: "1" }),
+  );
+  assert.equal(envOneConfig.insecureNoToken, true);
+
+  const envTruePath = join(mkdtempSync(join(tmpdir(), "outridr-config-")), "missing.json");
+  const envTrueConfig = loadConfigInSubprocess(
+    baseEnv({ OUTRIDR_CONFIG: envTruePath, OUTRIDR_INSECURE_NO_TOKEN: "true" }),
+  );
+  assert.equal(envTrueConfig.insecureNoToken, false);
+});
+
 test("expandHome: ~/x expands, /abs unchanged, non-string passthrough", async () => {
   const { expandHome } = await import("../lib/config.mjs");
   assert.equal(expandHome("~/x"), join(homedir(), "x"));

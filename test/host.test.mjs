@@ -27,7 +27,7 @@ function writeChildScript(config) {
   return scriptPath;
 }
 
-function childConfig() {
+function childConfig(overrides = {}) {
   return {
     port: 0,
     host: "tailscale",
@@ -37,6 +37,7 @@ function childConfig() {
     exec: null,
     repos: null,
     push: { notifyOn: ["blocked", "done"], pollMs: 5000, enabled: false },
+    ...overrides,
   };
 }
 
@@ -244,6 +245,53 @@ test("host re-check: Tailscale IPv4 unchanged -> subprocess stays alive", async 
   await delay(500);
   assert.equal(child.exitCode, null);
   child.kill();
+});
+
+test("bind guard: non-loopback host without token -> subprocess exits 1", async (t) => {
+  const scriptPath = writeChildScript(childConfig({ host: "0.0.0.0" }));
+  const { child, output } = spawnChild(scriptPath, baseEnv());
+  t.after(() => child.kill());
+
+  const { code } = await waitForExit(child);
+  assert.equal(code, 1);
+  assert.match(output.stderr, /refusing to listen/);
+});
+
+test("bind guard: non-loopback host with token -> server listens", async (t) => {
+  const scriptPath = writeChildScript(childConfig({ host: "0.0.0.0", token: "test-token" }));
+  const { child, output } = spawnChild(scriptPath, baseEnv());
+  t.after(() => child.kill());
+
+  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 0.0.0.0:"));
+  child.kill();
+});
+
+test("bind guard: non-loopback host with insecureNoToken -> server listens", async (t) => {
+  const scriptPath = writeChildScript(childConfig({ host: "0.0.0.0", insecureNoToken: true }));
+  const { child, output } = spawnChild(scriptPath, baseEnv());
+  t.after(() => child.kill());
+
+  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 0.0.0.0:"));
+  child.kill();
+});
+
+test("bind guard: loopback host without token -> server listens", async (t) => {
+  const scriptPath = writeChildScript(childConfig({ host: "127.0.0.1" }));
+  const { child, output } = spawnChild(scriptPath, baseEnv());
+  t.after(() => child.kill());
+
+  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  child.kill();
+});
+
+test("bind guard: hostname starting with 127. is not loopback -> subprocess exits 1", async (t) => {
+  const scriptPath = writeChildScript(childConfig({ host: "127.0.0.1.invalid" }));
+  const { child, output } = spawnChild(scriptPath, baseEnv());
+  t.after(() => child.kill());
+
+  const { code } = await waitForExit(child);
+  assert.equal(code, 1);
+  assert.match(output.stderr, /refusing to listen/);
 });
 
 test("host re-check: transient Tailscale failure after listen -> subprocess stays alive", async (t) => {

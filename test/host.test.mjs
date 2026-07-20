@@ -105,6 +105,31 @@ test("host resolution: tailscale reports an IPv4 -> server listens on it", async
     scriptPath,
     baseEnv({
       PATH: fakeDir,
+      // Pin the fake explicitly so this test is deterministic even on a
+      // macOS runner with the real Tailscale.app installed, where
+      // tailscaleBin()'s bundle-path fallback would otherwise win over PATH.
+      OUTRIDR_TAILSCALE_BIN: join(fakeDir, "tailscale"),
+      OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
+      OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
+    }),
+  );
+  t.after(() => child.kill());
+
+  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+});
+
+test("host resolution: OUTRIDR_TAILSCALE_BIN overrides an absolute path not on PATH -> server listens", async (t) => {
+  // Proves tailscaleBin()'s override is honored even when the binary is
+  // nowhere on PATH — the same mechanism macOS's Tailscale.app bundle
+  // fallback relies on, made deterministic for CI without needing darwin.
+  const binDir = writeFakeTailscale(makeTmpDir("outridr-tailscale-bin-override"), "#!/bin/sh\necho 127.0.0.1\n");
+  const emptyPathDir = makeTmpDir("outridr-empty-path");
+  const scriptPath = writeChildScript(childConfig());
+  const { child, output } = spawnChild(
+    scriptPath,
+    baseEnv({
+      PATH: emptyPathDir,
+      OUTRIDR_TAILSCALE_BIN: join(binDir, "tailscale"),
       OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
       OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
     }),
@@ -121,6 +146,7 @@ test("host resolution: tailscale always fails -> subprocess exits 1", async (t) 
     scriptPath,
     baseEnv({
       PATH: fakeDir,
+      OUTRIDR_TAILSCALE_BIN: join(fakeDir, "tailscale"),
       OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
       OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
     }),
@@ -139,6 +165,10 @@ test("host resolution: tailscale binary missing -> subprocess exits 1 with a cle
     scriptPath,
     baseEnv({
       PATH: `${emptyDir}:${dirname(process.execPath)}`,
+      // An absolute path that doesn't exist throws ENOENT the same way a
+      // PATH lookup miss does — pin it so the real Tailscale.app bundle (if
+      // installed on the runner) can't be found instead.
+      OUTRIDR_TAILSCALE_BIN: join(emptyDir, "tailscale"),
       OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
       OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
     }),
@@ -177,6 +207,7 @@ test("host resolution: tailscale fails twice then succeeds -> server eventually 
       // read its invocation counter, so PATH needs real system dirs too —
       // fakeDir still wins the `tailscale` lookup because it's listed first.
       PATH: `${fakeDir}:/bin:/usr/bin`,
+      OUTRIDR_TAILSCALE_BIN: join(fakeDir, "tailscale"),
       OUTRIDR_HOST_RESOLVE_ATTEMPTS: "3",
       OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
     }),
@@ -214,6 +245,7 @@ test("host re-check: Tailscale IPv4 changes after listen -> subprocess exits 1",
       // Shells out to `cat` internally, so PATH needs real system dirs too —
       // fakeDir still wins the `tailscale` lookup because it's listed first.
       PATH: `${fakeDir}:/bin:/usr/bin`,
+      OUTRIDR_TAILSCALE_BIN: join(fakeDir, "tailscale"),
       OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
       OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
       OUTRIDR_HOST_RECHECK_MS: "100",
@@ -234,6 +266,7 @@ test("host re-check: Tailscale IPv4 unchanged -> subprocess stays alive", async 
     scriptPath,
     baseEnv({
       PATH: fakeDir,
+      OUTRIDR_TAILSCALE_BIN: join(fakeDir, "tailscale"),
       OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
       OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
       OUTRIDR_HOST_RECHECK_MS: "100",
@@ -319,6 +352,7 @@ test("host re-check: transient Tailscale failure after listen -> subprocess stay
     scriptPath,
     baseEnv({
       PATH: `${fakeDir}:/bin:/usr/bin`,
+      OUTRIDR_TAILSCALE_BIN: join(fakeDir, "tailscale"),
       OUTRIDR_HOST_RESOLVE_ATTEMPTS: "2",
       OUTRIDR_HOST_RESOLVE_DELAY_MS: "50",
       OUTRIDR_HOST_RECHECK_MS: "100",

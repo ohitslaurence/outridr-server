@@ -1,11 +1,33 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { connect as netConnect } from "node:net";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 import { connectRawWs, encodeMaskedFrame, startFakeHerdr, startTestServer } from "./helpers.mjs";
 
 const WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const wsLimitRunner = join(repoRoot, "test", "ws-limit-runner.mjs");
+
+// OUTRIDR_WS_MAX_CONNECTIONS / OUTRIDR_WS_IDLE_MS are read once, at module
+// load of lib/websocket.mjs — and every other test in this file already
+// shares one process whose first startTestServer() call froze the defaults
+// (32 connections / 10 min idle) into that module instance. So the two tests
+// below run test/ws-limit-runner.mjs in a dedicated subprocess with its own
+// env, matching the "env set before the module is ever imported" discipline
+// used for OUTRIDR_EXPO_PUSH_URL in test/push.test.mjs.
+function runWsLimitScenario(mode, envOverrides) {
+  const stdout = execFileSync(process.execPath, [wsLimitRunner, mode], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: { PATH: process.env.PATH, HOME: process.env.HOME, ...envOverrides },
+  });
+  const jsonStart = stdout.indexOf("{");
+  return JSON.parse(stdout.slice(jsonStart));
+}
 
 function expectedAccept(key) {
   return createHash("sha1").update(key + WS_GUID).digest("base64");
@@ -337,4 +359,15 @@ test("close — server responds with close frame and ends the TCP socket", async
     client.socket.once("close", resolve);
     client.socket.once("end", resolve);
   });
+});
+
+test("connection cap — a 3rd connection beyond OUTRIDR_WS_MAX_CONNECTIONS does not reach 101", () => {
+  const { thirdStatusCode } = runWsLimitScenario("cap", { OUTRIDR_WS_MAX_CONNECTIONS: "2" });
+  assert.equal(thirdStatusCode, 503);
+});
+
+test("idle timeout — a silent connection is closed within OUTRIDR_WS_IDLE_MS", () => {
+  const { elapsedMs } = runWsLimitScenario("idle", { OUTRIDR_WS_IDLE_MS: "200" });
+  assert.ok(elapsedMs < 3000, `expected the idle timeout to fire well under 3s, took ${elapsedMs}ms`);
+  assert.ok(elapsedMs >= 150, `expected the idle timeout not to fire before ~200ms, took ${elapsedMs}ms`);
 });

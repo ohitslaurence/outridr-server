@@ -236,8 +236,14 @@ The rest are mostly for tuning/testing and rarely need to change:
 interval, default 900000 = 15 min), `OUTRIDR_HOST_RESOLVE_ATTEMPTS` /
 `OUTRIDR_HOST_RESOLVE_DELAY_MS` (boot-time Tailscale IP resolution retries
 and delay), `OUTRIDR_HOST_RECHECK_MS` (running IP re-check interval,
-default 60000), and `OUTRIDR_TAILSCALE_BIN` (path to the `tailscale` binary,
-overriding both `PATH` lookup and the macOS app-bundle fallback).
+default 60000), `OUTRIDR_TAILSCALE_BIN` (path to the `tailscale` binary,
+overriding both `PATH` lookup and the macOS app-bundle fallback),
+`OUTRIDR_WS_MAX_CONNECTIONS` (max concurrent `/herdr` WebSocket connections,
+default 32), and `OUTRIDR_WS_IDLE_MS` (idle timeout before an inactive
+WebSocket connection is closed, default 600000 = 10 min).
+
+`outridr config` masks a configured `token` by default; pass `--show-secrets`
+to print it in cleartext.
 
 ## Security model
 

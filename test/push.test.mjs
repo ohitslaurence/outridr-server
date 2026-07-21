@@ -18,7 +18,8 @@ process.env.OUTRIDR_EXPO_PUSH_URL = fakeExpo.url;
 process.env.OUTRIDR_RECEIPT_CHECK_MS = "100";
 after(() => fakeExpo.close());
 
-const { chunkArray, EXPO_BATCH_LIMIT, MAX_PUSH_TOKENS, receiptsUrl } = await import("../lib/push.mjs");
+const { chunkArray, EXPO_BATCH_LIMIT, MAX_PUSH_TOKENS, receiptsUrl } =
+  await import("../lib/push.mjs");
 
 // Leaked-watcher note: startPushWatcher()'s poll and receipt-check timers
 // are never stopped (server.close() doesn't touch them), so every test
@@ -73,7 +74,10 @@ test("receiptsUrl — derives the getReceipts endpoint from a real send URL", ()
 
 test("receiptsUrl — falls back to appending the path for a URL with no trailing /send", () => {
   const url = receiptsUrl("http://127.0.0.1:9999/");
-  assert.ok(url.pathname.endsWith("/getReceipts"), `expected path to end with /getReceipts, got ${url.pathname}`);
+  assert.ok(
+    url.pathname.endsWith("/getReceipts"),
+    `expected path to end with /getReceipts, got ${url.pathname}`,
+  );
 });
 
 test("chunkArray — splits into groups of size, batching sendExpoPush past EXPO_BATCH_LIMIT", () => {
@@ -96,7 +100,10 @@ test("POST /push/unregister — removes a token, is idempotent for unknown token
   t.after(() => server.close());
 
   const token = "ExponentPushToken[unregister-me]";
-  const registered = await postJson(`http://127.0.0.1:${port}/push/register`, { token, device: "phone" });
+  const registered = await postJson(`http://127.0.0.1:${port}/push/register`, {
+    token,
+    device: "phone",
+  });
   assert.equal(registered.status, 200);
   assert.deepEqual(registered.body, { ok: true, registered: 1 });
 
@@ -120,7 +127,10 @@ test("PushTokenStore cap — registering one token past the cap evicts the oldes
   const { server, port } = await startTestServer();
   t.after(() => server.close());
 
-  const tokens = Array.from({ length: MAX_PUSH_TOKENS + 1 }, (_, i) => `ExponentPushToken[cap-${i}]`);
+  const tokens = Array.from(
+    { length: MAX_PUSH_TOKENS + 1 },
+    (_, i) => `ExponentPushToken[cap-${i}]`,
+  );
   for (const token of tokens) {
     const { status, body } = await postJson(`http://127.0.0.1:${port}/push/register`, {
       token,
@@ -167,7 +177,10 @@ test("push watcher — a status transition into a notify-worthy state pushes exa
   t.after(() => herdr.close());
 
   const token = "ExponentPushToken[transition]";
-  const { status } = await postJson(`http://127.0.0.1:${port}/push/register`, { token, device: "phone" });
+  const { status } = await postJson(`http://127.0.0.1:${port}/push/register`, {
+    token,
+    device: "phone",
+  });
   assert.equal(status, 200);
 
   await waitFor(() => fakeExpo.requests.length >= 1);
@@ -212,7 +225,11 @@ test("push watcher — baseline suppression: already-notify-worthy on first poll
   });
 
   await sleep(50 * 5);
-  assert.equal(fakeExpo.requests.length, 0, "restart must not replay an already-blocked status as a transition");
+  assert.equal(
+    fakeExpo.requests.length,
+    0,
+    "restart must not replay an already-blocked status as a transition",
+  );
 });
 
 test("push watcher — prunes a token whose ticket reports DeviceNotRegistered", async (t) => {
@@ -339,10 +356,18 @@ test("push watcher — an agent that vanishes and reappears still-notify-worthy 
   });
 
   await waitFor(() => fakeExpo.requests.length >= 2, { timeoutMs: 3000 });
-  assert.equal(fakeExpo.requests.length, 2, "reappearing in a notify-worthy state after vanishing is a fresh transition");
+  assert.equal(
+    fakeExpo.requests.length,
+    2,
+    "reappearing in a notify-worthy state after vanishing is a fresh transition",
+  );
 
   await sleep(50 * 4);
-  assert.equal(fakeExpo.requests.length, 2, "status stays blocked afterward — no additional pushes");
+  assert.equal(
+    fakeExpo.requests.length,
+    2,
+    "status stays blocked afterward — no additional pushes",
+  );
 });
 
 test("push watcher — a DeviceNotRegistered receipt (delivery-layer failure) prunes the token", async (t) => {
@@ -369,8 +394,14 @@ test("push watcher — a DeviceNotRegistered receipt (delivery-layer failure) pr
 
   const liveToken = "ExponentPushToken[receipt-live]";
   const deadToken = "ExponentPushToken[receipt-dead]";
-  await postJson(`http://127.0.0.1:${port}/push/register`, { token: liveToken, device: "phone-live" });
-  await postJson(`http://127.0.0.1:${port}/push/register`, { token: deadToken, device: "phone-dead" });
+  await postJson(`http://127.0.0.1:${port}/push/register`, {
+    token: liveToken,
+    device: "phone-live",
+  });
+  await postJson(`http://127.0.0.1:${port}/push/register`, {
+    token: deadToken,
+    device: "phone-dead",
+  });
 
   // Ticket-level status is "ok" for both — Expo accepted them — but the
   // dead token later fails at the APNs/FCM layer, surfaced only via the
@@ -388,7 +419,11 @@ test("push watcher — a DeviceNotRegistered receipt (delivery-layer failure) pr
   fakeExpo.setReceipts((ids) => {
     const data = {};
     if (ids.includes(deadTicketId)) {
-      data[deadTicketId] = { status: "error", message: "not registered", details: { error: "DeviceNotRegistered" } };
+      data[deadTicketId] = {
+        status: "error",
+        message: "not registered",
+        details: { error: "DeviceNotRegistered" },
+      };
     }
     return data;
   });
@@ -434,7 +469,9 @@ test("push watcher — an ok receipt stops further receipt polling for that tick
 
   fakeExpo.setReceipts((ids) => (ids.includes(ticketId) ? { [ticketId]: { status: "ok" } } : {}));
 
-  await waitFor(() => fakeExpo.receiptsRequests.some((ids) => ids.includes(ticketId)), { timeoutMs: 3000 });
+  await waitFor(() => fakeExpo.receiptsRequests.some((ids) => ids.includes(ticketId)), {
+    timeoutMs: 3000,
+  });
   // Other in-process watcher timers (see helpers.mjs/leaked-watcher note in
   // this file's header) can have a request for this id already in flight
   // when the receipt lands, so give that wave a moment to drain before
@@ -444,7 +481,10 @@ test("push watcher — an ok receipt stops further receipt polling for that tick
 
   await sleep(50 * 6);
   const laterRequests = fakeExpo.receiptsRequests.slice(seenAt);
-  assert.ok(laterRequests.length > 0, "expected more receipt-check cycles to run after the receipt arrived");
+  assert.ok(
+    laterRequests.length > 0,
+    "expected more receipt-check cycles to run after the receipt arrived",
+  );
   assert.ok(
     laterRequests.every((ids) => !ids.includes(ticketId)),
     "an id should stop being polled once its receipt has arrived",
@@ -483,11 +523,19 @@ test("push watcher — a non-DeviceNotRegistered receipt error does not prune th
 
   fakeExpo.setReceipts((ids) =>
     ids.includes(ticketId)
-      ? { [ticketId]: { status: "error", message: "rate exceeded", details: { error: "MessageRateExceeded" } } }
+      ? {
+          [ticketId]: {
+            status: "error",
+            message: "rate exceeded",
+            details: { error: "MessageRateExceeded" },
+          },
+        }
       : {},
   );
 
-  await waitFor(() => fakeExpo.receiptsRequests.some((ids) => ids.includes(ticketId)), { timeoutMs: 3000 });
+  await waitFor(() => fakeExpo.receiptsRequests.some((ids) => ids.includes(ticketId)), {
+    timeoutMs: 3000,
+  });
   await sleep(50 * 5);
   const persisted = readPersistedTokens();
   assert.equal(persisted.length, 1, "only DeviceNotRegistered receipts should prune a token");

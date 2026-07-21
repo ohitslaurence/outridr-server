@@ -30,7 +30,7 @@ export function makeConfig(overrides = {}) {
   return {
     ...base,
     ...overrides,
-    push: { ...base.push, ...(overrides.push ?? {}) },
+    push: { ...base.push, ...overrides.push },
   };
 }
 
@@ -210,7 +210,9 @@ export function writeSessionFixture(projectsDir, sessionId, lines, options = {})
   const dir = join(projectsDir, subdir);
   mkdirSync(dir, { recursive: true });
   const filePath = join(dir, `${sessionId}.jsonl`);
-  const serializedLines = lines.map((line) => (typeof line === "string" ? line : JSON.stringify(line)));
+  const serializedLines = lines.map((line) =>
+    typeof line === "string" ? line : JSON.stringify(line),
+  );
   const content =
     serializedLines.join("\n") + (trailingNewline && serializedLines.length > 0 ? "\n" : "");
   writeFileSync(filePath, content);

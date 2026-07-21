@@ -54,7 +54,10 @@ async function runIdle() {
   }
   const start = Date.now();
   await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("idle timeout did not close the connection in time")), 5000);
+    const timer = setTimeout(
+      () => reject(new Error("idle timeout did not close the connection in time")),
+      5000,
+    );
     client.socket.once("close", () => {
       clearTimeout(timer);
       resolve();

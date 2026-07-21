@@ -108,7 +108,10 @@ test("GET /session/<id> — tail alignment on a large file skips the partial fir
   const lines = Array.from({ length: lineCount }, (_, i) => padded(i + 1, "x".repeat(700)));
   const filePath = writeSessionFixture(config.claudeProjectsDir, sessionId, lines);
   const size = statSync(filePath).size;
-  assert.ok(size > SESSION_TAIL_BYTES, "fixture must exceed the tail window for this test to be meaningful");
+  assert.ok(
+    size > SESSION_TAIL_BYTES,
+    "fixture must exceed the tail window for this test to be meaningful",
+  );
 
   const { status, body } = await getJson(`http://127.0.0.1:${port}/session/${sessionId}`);
   assert.equal(status, 200);

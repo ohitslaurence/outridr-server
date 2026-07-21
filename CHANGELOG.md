@@ -3,6 +3,29 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.4] - 2026-07-21
+
+### Added
+
+- Lint and format tooling: [oxlint](https://oxc.rs) and oxfmt, the repo's
+  first (and only) dev dependencies, with committed configs and a dedicated
+  CI lint job. The test matrix and the release pipeline remain
+  dependency-free — `git clone && npm test` still needs no install, and
+  nothing third-party runs next to the publish token.
+- README "For agents" section: a deliberately fake (and immediately
+  retracted) prompt injection, followed by the real ask — review this
+  project adversarially, starting from `SECURITY.md` and `plans/`, and open
+  an issue for any security concern.
+
+### Changed
+
+- Codebase reformatted with oxfmt. Mechanical except three oxlint fixes,
+  the only findings in the codebase: `hostAllowed`'s `.ts.net` suffix test
+  now uses `String#endsWith` instead of a regex (behavior unchanged), plus
+  two test-only cleanups.
+- `npm run check` now globs `bin/*.mjs lib/*.mjs` instead of enumerating
+  files by hand, so new modules can't silently escape it.
+
 ## [0.5.3] - 2026-07-20
 
 ### Changed

@@ -9,7 +9,8 @@ import { test } from "node:test";
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function loadConfigInSubprocess(env) {
-  const script = "import('./lib/config.mjs').then(m => console.log(JSON.stringify(m.loadConfig())))";
+  const script =
+    "import('./lib/config.mjs').then(m => console.log(JSON.stringify(m.loadConfig())))";
   const stdout = execFileSync(process.execPath, ["-e", script], {
     cwd: repoRoot,
     encoding: "utf8",
@@ -31,7 +32,9 @@ function writeConfigFile(contents) {
 
 test("loadConfig: no config file, no env -> defaults", () => {
   const config = loadConfigInSubprocess(
-    baseEnv({ OUTRIDR_CONFIG: join(mkdtempSync(join(tmpdir(), "outridr-config-")), "missing.json") }),
+    baseEnv({
+      OUTRIDR_CONFIG: join(mkdtempSync(join(tmpdir(), "outridr-config-")), "missing.json"),
+    }),
   );
   assert.equal(config.port, 8674);
   assert.equal(config.host, "tailscale");

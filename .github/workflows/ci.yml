@@ -5,6 +5,18 @@ on:
 permissions:
   contents: read
 jobs:
+  # Lint/format run in their own job so the test matrix (and the release
+  # workflow's prepublishOnly) stay dependency-free: `git clone && npm test`
+  # needs no install, and nothing third-party runs next to the publish token.
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
   test:
     strategy:
       matrix:

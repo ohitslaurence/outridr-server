@@ -2,24 +2,46 @@
   "name": "outridr",
   "version": "0.5.3",
   "description": "Ride flank on your coding agents — expose a herdr machine to your tailnet for the outridr mobile app",
-  "keywords": ["herdr", "claude-code", "coding-agents", "tailscale", "tailnet", "mobile", "push-notifications", "agent-monitoring"],
+  "keywords": [
+    "agent-monitoring",
+    "claude-code",
+    "coding-agents",
+    "herdr",
+    "mobile",
+    "push-notifications",
+    "tailnet",
+    "tailscale"
+  ],
   "homepage": "https://github.com/ohitslaurence/outridr-server#readme",
   "bugs": "https://github.com/ohitslaurence/outridr-server/issues",
   "license": "MIT",
   "repository": "github:ohitslaurence/outridr-server",
-  "type": "module",
   "bin": {
     "outridr": "./bin/outridr.mjs"
   },
-  "files": ["bin", "lib", "herdr-plugin.toml", "README.md"],
-  "engines": {
-    "node": ">=20"
-  },
+  "files": [
+    "bin",
+    "lib",
+    "herdr-plugin.toml",
+    "README.md"
+  ],
+  "type": "module",
   "scripts": {
     "serve": "node bin/outridr.mjs serve",
-    "check": "node --check bin/outridr.mjs && node --check lib/config.mjs && node --check lib/config-write.mjs && node --check lib/herdr.mjs && node --check lib/http-util.mjs && node --check lib/pair.mjs && node --check lib/push.mjs && node --check lib/qr.mjs && node --check lib/repos.mjs && node --check lib/server.mjs && node --check lib/service.mjs && node --check lib/session.mjs && node --check lib/websocket.mjs",
+    "check": "for f in bin/*.mjs lib/*.mjs; do node --check \"$f\" || exit 1; done",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
     "check:versions": "node -e \"const {readFileSync}=require('node:fs'); const v=require('./package.json').version; const m=readFileSync('herdr-plugin.toml','utf8').match(/^version = \\\"(.+)\\\"$/m); if(!m||m[1]!==v){console.error('herdr-plugin.toml version '+(m?m[1]:'<missing>')+' != package.json '+v); process.exit(1);}\"",
     "test": "node --test test/*.test.mjs",
     "prepublishOnly": "npm run check && npm test"
+  },
+  "devDependencies": {
+    "oxfmt": "^0.59.0",
+    "oxlint": "^1.74.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

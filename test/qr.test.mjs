@@ -41,7 +41,10 @@ test("encodeToMatrix: matrix side follows 21 + 4*(version-1) for larger inputs",
   // version is chosen, size must satisfy the QR spec's formula exactly.
   const matrix = encodeToMatrix("x".repeat(200));
   const size = matrix.length;
-  assert.equal(matrix.every((row) => row.length === size), true);
+  assert.equal(
+    matrix.every((row) => row.length === size),
+    true,
+  );
   assert.equal((size - 17) % 4, 0, "size must be 21 + 4*(version-1) for some integer version");
   const version = (size - 17) / 4;
   assert.ok(version >= 1 && version <= 40);
@@ -77,7 +80,10 @@ test("renderMatrix: returns a non-empty string and never throws across a range o
     const rendered = renderMatrix(matrix);
     assert.equal(typeof rendered, "string");
     assert.ok(rendered.length > 0, `renderMatrix produced an empty string for length ${len}`);
-    assert.ok(rendered.includes("\n"), `renderMatrix output should be multi-line for length ${len}`);
+    assert.ok(
+      rendered.includes("\n"),
+      `renderMatrix output should be multi-line for length ${len}`,
+    );
   }
 });
 
@@ -87,9 +93,17 @@ test("renderMatrix: adds a 4-module quiet zone (blank border) on every side", ()
   const lines = rendered.split("\n").filter((line) => line.length > 0);
   // First two module rows are the quiet zone; rendered two-per-line, so the
   // first line is entirely blank space (no half-block glyphs).
-  assert.equal(/^ +$/.test(lines[0]), true, "first rendered line should be entirely blank (quiet zone)");
+  assert.equal(
+    /^ +$/.test(lines[0]),
+    true,
+    "first rendered line should be entirely blank (quiet zone)",
+  );
   const lastLine = lines[lines.length - 1];
-  assert.equal(/^ +$/.test(lastLine), true, "last rendered line should be entirely blank (quiet zone)");
+  assert.equal(
+    /^ +$/.test(lastLine),
+    true,
+    "last rendered line should be entirely blank (quiet zone)",
+  );
   // Every line should be padded on the left/right by at least 4 blank columns.
   for (const line of lines) {
     assert.equal(line.slice(0, 4), "    ", "left quiet zone should be blank");

@@ -60,7 +60,9 @@ test("pair: no token configured -> generates one, persists it, and reuses it on 
   const env = baseEnv({ OUTRIDR_CONFIG: cfgPath, OUTRIDR_HOST: "127.0.0.1", OUTRIDR_PORT: "8674" });
 
   const firstStdout = runPair(env);
-  const firstMatch = firstStdout.match(/outridr:\/\/pair\?v=1&host=127\.0\.0\.1&port=8674&token=([0-9a-f]+)/);
+  const firstMatch = firstStdout.match(
+    /outridr:\/\/pair\?v=1&host=127\.0\.0\.1&port=8674&token=([0-9a-f]+)/,
+  );
   assert.ok(firstMatch, "expected a generated token in the URI");
   const firstToken = firstMatch[1];
   assert.equal(firstToken.length, 64, "generated token should be 64 hex characters");
@@ -69,9 +71,15 @@ test("pair: no token configured -> generates one, persists it, and reuses it on 
   assert.equal(configFile.token, firstToken);
 
   const secondStdout = runPair(env);
-  const secondMatch = secondStdout.match(/outridr:\/\/pair\?v=1&host=127\.0\.0\.1&port=8674&token=([0-9a-f]+)/);
+  const secondMatch = secondStdout.match(
+    /outridr:\/\/pair\?v=1&host=127\.0\.0\.1&port=8674&token=([0-9a-f]+)/,
+  );
   assert.ok(secondMatch, "expected a token in the second run's URI");
-  assert.equal(secondMatch[1], firstToken, "pairing must be idempotent: same token on a second run");
+  assert.equal(
+    secondMatch[1],
+    firstToken,
+    "pairing must be idempotent: same token on a second run",
+  );
 });
 
 test("pair: prints a human summary line and a caution about the URI granting access", () => {
@@ -102,7 +110,11 @@ test("pair: host=tailscale prefers the MagicDNS name over the IP", () => {
     }),
   );
   assert.match(stdout, /outridr:\/\/pair\?v=1&host=gondor\.tailtest\.ts\.net&port=8674&token=abc/);
-  assert.doesNotMatch(stdout, /host=100\.114\.60\.46/, "should not fall back to the IP when a MagicDNS name exists");
+  assert.doesNotMatch(
+    stdout,
+    /host=100\.114\.60\.46/,
+    "should not fall back to the IP when a MagicDNS name exists",
+  );
 });
 
 test("pair: host=tailscale falls back to the IP when MagicDNS has no name", () => {

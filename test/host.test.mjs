@@ -63,7 +63,9 @@ function waitFor(getValue, predicate, { timeoutMs = 10000, intervalMs = 20 } = {
         return;
       }
       if (Date.now() - start > timeoutMs) {
-        reject(new Error(`timeout waiting for condition; last value seen: ${JSON.stringify(value)}`));
+        reject(
+          new Error(`timeout waiting for condition; last value seen: ${JSON.stringify(value)}`),
+        );
         return;
       }
       setTimeout(check, intervalMs);
@@ -74,7 +76,10 @@ function waitFor(getValue, predicate, { timeoutMs = 10000, intervalMs = 20 } = {
 
 function waitForExit(child, timeoutMs = 10000) {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("timeout waiting for process exit")), timeoutMs);
+    const timer = setTimeout(
+      () => reject(new Error("timeout waiting for process exit")),
+      timeoutMs,
+    );
     child.once("exit", (code, signal) => {
       clearTimeout(timer);
       resolve({ code, signal });
@@ -99,7 +104,10 @@ test("host resolution: tailscale reports an IPv4 -> server listens on it", async
   // The fake tailscale reports 127.0.0.1 (the only IPv4 guaranteed bindable
   // in any test sandbox) — what's under test is that resolveHost's output
   // reaches server.listen unmodified, not which address it happens to be.
-  const fakeDir = writeFakeTailscale(makeTmpDir("outridr-fake-tailscale"), "#!/bin/sh\necho 127.0.0.1\n");
+  const fakeDir = writeFakeTailscale(
+    makeTmpDir("outridr-fake-tailscale"),
+    "#!/bin/sh\necho 127.0.0.1\n",
+  );
   const scriptPath = writeChildScript(childConfig());
   const { child, output } = spawnChild(
     scriptPath,
@@ -115,14 +123,20 @@ test("host resolution: tailscale reports an IPv4 -> server listens on it", async
   );
   t.after(() => child.kill());
 
-  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  await waitFor(
+    () => output.stdout,
+    (stdout) => stdout.includes("outridr listening on 127.0.0.1:"),
+  );
 });
 
 test("host resolution: OUTRIDR_TAILSCALE_BIN overrides an absolute path not on PATH -> server listens", async (t) => {
   // Proves tailscaleBin()'s override is honored even when the binary is
   // nowhere on PATH — the same mechanism macOS's Tailscale.app bundle
   // fallback relies on, made deterministic for CI without needing darwin.
-  const binDir = writeFakeTailscale(makeTmpDir("outridr-tailscale-bin-override"), "#!/bin/sh\necho 127.0.0.1\n");
+  const binDir = writeFakeTailscale(
+    makeTmpDir("outridr-tailscale-bin-override"),
+    "#!/bin/sh\necho 127.0.0.1\n",
+  );
   const emptyPathDir = makeTmpDir("outridr-empty-path");
   const scriptPath = writeChildScript(childConfig());
   const { child, output } = spawnChild(
@@ -136,7 +150,10 @@ test("host resolution: OUTRIDR_TAILSCALE_BIN overrides an absolute path not on P
   );
   t.after(() => child.kill());
 
-  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  await waitFor(
+    () => output.stdout,
+    (stdout) => stdout.includes("outridr listening on 127.0.0.1:"),
+  );
 });
 
 test("host resolution: tailscale always fails -> subprocess exits 1", async (t) => {
@@ -214,7 +231,10 @@ test("host resolution: tailscale fails twice then succeeds -> server eventually 
   );
   t.after(() => child.kill());
 
-  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  await waitFor(
+    () => output.stdout,
+    (stdout) => stdout.includes("outridr listening on 127.0.0.1:"),
+  );
   assert.match(output.stderr, /waiting for a Tailscale IPv4/);
 });
 
@@ -253,14 +273,20 @@ test("host re-check: Tailscale IPv4 changes after listen -> subprocess exits 1",
   );
   t.after(() => child.kill());
 
-  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  await waitFor(
+    () => output.stdout,
+    (stdout) => stdout.includes("outridr listening on 127.0.0.1:"),
+  );
   const { code } = await waitForExit(child);
   assert.equal(code, 1);
   assert.match(output.stderr, /Tailscale IPv4 changed/);
 });
 
 test("host re-check: Tailscale IPv4 unchanged -> subprocess stays alive", async (t) => {
-  const fakeDir = writeFakeTailscale(makeTmpDir("outridr-fake-tailscale"), "#!/bin/sh\necho 127.0.0.1\n");
+  const fakeDir = writeFakeTailscale(
+    makeTmpDir("outridr-fake-tailscale"),
+    "#!/bin/sh\necho 127.0.0.1\n",
+  );
   const scriptPath = writeChildScript(childConfig());
   const { child, output } = spawnChild(
     scriptPath,
@@ -274,7 +300,10 @@ test("host re-check: Tailscale IPv4 unchanged -> subprocess stays alive", async 
   );
   t.after(() => child.kill());
 
-  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  await waitFor(
+    () => output.stdout,
+    (stdout) => stdout.includes("outridr listening on 127.0.0.1:"),
+  );
   await delay(500);
   assert.equal(child.exitCode, null);
   child.kill();
@@ -295,7 +324,10 @@ test("bind guard: non-loopback host with token -> server listens", async (t) => 
   const { child, output } = spawnChild(scriptPath, baseEnv());
   t.after(() => child.kill());
 
-  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 0.0.0.0:"));
+  await waitFor(
+    () => output.stdout,
+    (stdout) => stdout.includes("outridr listening on 0.0.0.0:"),
+  );
   child.kill();
 });
 
@@ -304,7 +336,10 @@ test("bind guard: non-loopback host with insecureNoToken -> server listens", asy
   const { child, output } = spawnChild(scriptPath, baseEnv());
   t.after(() => child.kill());
 
-  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 0.0.0.0:"));
+  await waitFor(
+    () => output.stdout,
+    (stdout) => stdout.includes("outridr listening on 0.0.0.0:"),
+  );
   child.kill();
 });
 
@@ -313,7 +348,10 @@ test("bind guard: loopback host without token -> server listens", async (t) => {
   const { child, output } = spawnChild(scriptPath, baseEnv());
   t.after(() => child.kill());
 
-  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  await waitFor(
+    () => output.stdout,
+    (stdout) => stdout.includes("outridr listening on 127.0.0.1:"),
+  );
   child.kill();
 });
 
@@ -360,7 +398,10 @@ test("host re-check: transient Tailscale failure after listen -> subprocess stay
   );
   t.after(() => child.kill());
 
-  await waitFor(() => output.stdout, (stdout) => stdout.includes("outridr listening on 127.0.0.1:"));
+  await waitFor(
+    () => output.stdout,
+    (stdout) => stdout.includes("outridr listening on 127.0.0.1:"),
+  );
   await delay(500);
   assert.equal(child.exitCode, null);
   child.kill();

@@ -30,7 +30,9 @@ function runWsLimitScenario(mode, envOverrides) {
 }
 
 function expectedAccept(key) {
-  return createHash("sha1").update(key + WS_GUID).digest("base64");
+  return createHash("sha1")
+    .update(key + WS_GUID)
+    .digest("base64");
 }
 
 function frameJson(frame) {
@@ -94,7 +96,9 @@ test("tokenless server: upgrade with an Origin header — rejected 403 (browser 
   const { server, port } = await startTestServer();
   t.after(() => server.close());
 
-  const client = await connectRawWs(port, "/herdr", { headers: { Origin: "https://evil.example" } });
+  const client = await connectRawWs(port, "/herdr", {
+    headers: { Origin: "https://evil.example" },
+  });
   assert.equal(client.statusCode, 403);
   await new Promise((resolve) => {
     client.socket.once("close", resolve);
@@ -346,7 +350,10 @@ test("in-flight cap — 100 one-line requests in a single message are all answer
   assert.equal(received.size, ids.length, "every request line must eventually receive a response");
   const busyCount = [...received.values()].filter((r) => r.error?.code === "outridr_busy").length;
   assert.ok(busyCount > 0, "expected the in-flight cap to reject at least one of the 100 lines");
-  assert.ok(busyCount < ids.length, "expected at least some lines to be answered by the fake herdr");
+  assert.ok(
+    busyCount < ids.length,
+    "expected at least some lines to be answered by the fake herdr",
+  );
 });
 
 test("unmasked frame — a valid but unmasked client frame closes 1002", async (t) => {
@@ -357,7 +364,10 @@ test("unmasked frame — a valid but unmasked client frame closes 1002", async (
   t.after(() => client.close());
   assert.equal(client.statusCode, 101);
 
-  client.sendUnmaskedFrame(0x1, Buffer.from(JSON.stringify({ id: "u1", method: "ping", params: {} }), "utf8"));
+  client.sendUnmaskedFrame(
+    0x1,
+    Buffer.from(JSON.stringify({ id: "u1", method: "ping", params: {} }), "utf8"),
+  );
 
   const frame = await client.nextFrame();
   assert.equal(frame.opcode, 0x8);
@@ -388,6 +398,12 @@ test("connection cap — a 3rd connection beyond OUTRIDR_WS_MAX_CONNECTIONS does
 
 test("idle timeout — a silent connection is closed within OUTRIDR_WS_IDLE_MS", () => {
   const { elapsedMs } = runWsLimitScenario("idle", { OUTRIDR_WS_IDLE_MS: "200" });
-  assert.ok(elapsedMs < 3000, `expected the idle timeout to fire well under 3s, took ${elapsedMs}ms`);
-  assert.ok(elapsedMs >= 150, `expected the idle timeout not to fire before ~200ms, took ${elapsedMs}ms`);
+  assert.ok(
+    elapsedMs < 3000,
+    `expected the idle timeout to fire well under 3s, took ${elapsedMs}ms`,
+  );
+  assert.ok(
+    elapsedMs >= 150,
+    `expected the idle timeout not to fire before ~200ms, took ${elapsedMs}ms`,
+  );
 });

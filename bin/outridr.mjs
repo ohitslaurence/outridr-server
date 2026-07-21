@@ -12,7 +12,9 @@ import { startServer } from "../lib/server.mjs";
 import { installService, serviceStatus, uninstallService } from "../lib/service.mjs";
 
 process.on("unhandledRejection", (reason) => {
-  console.error(`outridr: unhandled rejection: ${reason instanceof Error ? reason.message : reason}`);
+  console.error(
+    `outridr: unhandled rejection: ${reason instanceof Error ? reason.message : reason}`,
+  );
   process.exit(1);
 });
 

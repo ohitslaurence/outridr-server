@@ -44,17 +44,26 @@ test("GET /health — happy path", async (t) => {
 
   const { status, body } = await getJson(`http://127.0.0.1:${port}/health`);
   assert.equal(status, 200);
-  assert.deepEqual(body, { ok: true, version: PACKAGE_VERSION, herdr: { pong: true }, pushTokens: 0 });
+  assert.deepEqual(body, {
+    ok: true,
+    version: PACKAGE_VERSION,
+    herdr: { pong: true },
+    pushTokens: 0,
+  });
 });
 
-test("GET /health — herdr down", async (t) => {
-  const { server, port } = await startTestServer();
-  t.after(() => server.close());
+test(
+  "GET /health — herdr down",
+  async (t) => {
+    const { server, port } = await startTestServer();
+    t.after(() => server.close());
 
-  const { status, body } = await getJson(`http://127.0.0.1:${port}/health`);
-  assert.equal(status, 200);
-  assert.equal(body.herdr, null);
-}, { timeout: 10_000 });
+    const { status, body } = await getJson(`http://127.0.0.1:${port}/health`);
+    assert.equal(status, 200);
+    assert.equal(body.herdr, null);
+  },
+  { timeout: 10_000 },
+);
 
 // Both tests below force a *second* "data" event to arrive on the client's
 // unix socket after the response line has already been parsed: the response
@@ -88,7 +97,12 @@ test("GET /health — late TCP chunk after the response line, callback still fir
 
   const first = await getJson(`http://127.0.0.1:${port}/health`);
   assert.equal(first.status, 200);
-  assert.deepEqual(first.body, { ok: true, version: PACKAGE_VERSION, herdr: { pong: true }, pushTokens: 0 });
+  assert.deepEqual(first.body, {
+    ok: true,
+    version: PACKAGE_VERSION,
+    herdr: { pong: true },
+    pushTokens: 0,
+  });
 
   // A double callback would have thrown ERR_HTTP_HEADERS_SENT inside the
   // socket's "data" handler and crashed the process — reaching this second
@@ -115,7 +129,12 @@ test("GET /health — herdr RSTs partway through a multi-chunk response, callbac
 
   const first = await getJson(`http://127.0.0.1:${port}/health`);
   assert.equal(first.status, 200);
-  assert.deepEqual(first.body, { ok: true, version: PACKAGE_VERSION, herdr: { pong: true }, pushTokens: 0 });
+  assert.deepEqual(first.body, {
+    ok: true,
+    version: PACKAGE_VERSION,
+    herdr: { pong: true },
+    pushTokens: 0,
+  });
 
   const second = await getJson(`http://127.0.0.1:${port}/health`);
   assert.equal(second.status, 200);
@@ -153,7 +172,13 @@ test("request with a non-tailnet Host header — 421 misdirected request", async
   // authority — so this needs node:http's client, which allows it.
   const { status } = await new Promise((resolve, reject) => {
     const req = httpRequest(
-      { hostname: "127.0.0.1", port, path: "/health", method: "GET", headers: { host: "evil.example" } },
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: "/health",
+        method: "GET",
+        headers: { host: "evil.example" },
+      },
       (res) => {
         res.resume();
         res.on("end", () => resolve({ status: res.statusCode }));
@@ -176,7 +201,13 @@ test("request with an all-hex domain Host header — 421 (regex-vs-isIP regressi
 
   const { status } = await new Promise((resolve, reject) => {
     const req = httpRequest(
-      { hostname: "127.0.0.1", port, path: "/health", method: "GET", headers: { host: "dead.cafe" } },
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: "/health",
+        method: "GET",
+        headers: { host: "dead.cafe" },
+      },
       (res) => {
         res.resume();
         res.on("end", () => resolve({ status: res.statusCode }));
@@ -260,7 +291,11 @@ test("POST /push/register — multibyte device name split mid-character across t
   const stateFile = join(process.env.OUTRIDR_STATE_DIR, "push-tokens.json");
   const persisted = JSON.parse(readFileSync(stateFile, "utf8"));
   const registered = persisted.find((entry) => entry.token === "ExponentPushToken[abc]");
-  assert.equal(registered.device, device, "multibyte device name must survive the mid-character split intact");
+  assert.equal(
+    registered.device,
+    device,
+    "multibyte device name must survive the mid-character split intact",
+  );
 });
 
 test("POST /push/register — malformed JSON body -> 400", async (t) => {
@@ -400,7 +435,10 @@ test("PUT /repos/roots — entry not an existing directory -> 400 naming it, con
 test("PUT /repos/roots — preserves unrelated config keys (including token)", async (t) => {
   const root = makeTmpDir("outridr-repos-preserve");
   mkdirSync(join(root, "planted", ".git"), { recursive: true });
-  writeFileSync(process.env.OUTRIDR_CONFIG, JSON.stringify({ token: "secret", custom: { keep: true } }));
+  writeFileSync(
+    process.env.OUTRIDR_CONFIG,
+    JSON.stringify({ token: "secret", custom: { keep: true } }),
+  );
 
   const { server, port } = await startTestServer({ token: "secret" });
   t.after(() => server.close());
@@ -438,7 +476,7 @@ test("unknown route -> 404", async (t) => {
   assert.equal(status, 404);
 });
 
-test("startServer — EADDRINUSE on the second listen exits 1 with a server error message", async (t) => {
+test("startServer — EADDRINUSE on the second listen exits 1 with a server error message", async () => {
   const port = await reserveFreePort();
   const scriptDir = makeTmpDir("outridr-eaddrinuse");
   const scriptPath = join(scriptDir, "double-listen.mjs");

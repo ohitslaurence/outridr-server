@@ -42,7 +42,10 @@ test("xmlEscape: non-string values are coerced to string", () => {
 
 test("lib/service.mjs: the launchd plist template runs interpolated values through xmlEscape", () => {
   const usages = serviceSource.match(/\$\{xmlEscape\(/g) ?? [];
-  assert.ok(usages.length >= 3, `expected >= 3 template usages of xmlEscape(, found ${usages.length}`);
+  assert.ok(
+    usages.length >= 3,
+    `expected >= 3 template usages of xmlEscape(, found ${usages.length}`,
+  );
 });
 
 test("installCliLauncher: writes an executable launcher that execs the pinned Node binary", () => {
@@ -52,7 +55,10 @@ test("installCliLauncher: writes an executable launcher that execs the pinned No
   assert.ok(mode & 0o111, "launcher should be executable");
   assert.ok(contents.includes(process.execPath), "launcher should exec the pinned Node binary");
   assert.ok(contents.includes("outridr.mjs"), "launcher should invoke the outridr entrypoint");
-  assert.ok(contents.includes("# managed by `outridr install` — safe to delete"), "launcher should contain the marker");
+  assert.ok(
+    contents.includes("# managed by `outridr install` — safe to delete"),
+    "launcher should contain the marker",
+  );
 });
 
 test("removeCliLauncher: deletes the launcher it wrote", () => {

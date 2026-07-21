@@ -219,6 +219,41 @@ test("request with an all-hex domain Host header — 421 (regex-vs-isIP regressi
   assert.equal(status, 421);
 });
 
+test("tokenless server: POST /push/register with an Origin header — 403 (browser drive-by CSRF defense)", async (t) => {
+  // A hostile web page can reach a loopback/tailnet literal with an allowed
+  // Host, and POST + text/plain is a CORS "simple request" so no preflight
+  // fires. Without an Origin check on the HTTP surface (the WS surface already
+  // has one) the page could register its own Expo token and hijack push
+  // notifications. SECURITY.md promises Origin rejection on both surfaces.
+  const { server, port } = await startTestServer();
+  t.after(() => server.close());
+
+  const body = JSON.stringify({ token: "ExponentPushToken[attacker]", device: "x" });
+  const { status } = await new Promise((resolve, reject) => {
+    const req = httpRequest(
+      {
+        hostname: "127.0.0.1",
+        port,
+        path: "/push/register",
+        method: "POST",
+        headers: {
+          host: `127.0.0.1:${port}`,
+          origin: "http://evil.example",
+          "content-type": "text/plain",
+          "content-length": Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        res.resume();
+        res.on("end", () => resolve({ status: res.statusCode }));
+      },
+    );
+    req.on("error", reject);
+    req.end(body);
+  });
+  assert.equal(status, 403);
+});
+
 test("POST with a >64 KiB body — 413 body too large", async (t) => {
   const { server, port } = await startTestServer();
   t.after(() => server.close());

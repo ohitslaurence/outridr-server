@@ -356,6 +356,43 @@ test("in-flight cap — 100 one-line requests in a single message are all answer
   );
 });
 
+test("busy flood — a large single message drains through the pump, all overflow lines answered, connection stays open", async (t) => {
+  const { server, port, config } = await startTestServer();
+  t.after(() => server.close());
+  // Accept each request but never reply and never close, so every unix socket
+  // outridr opens stays live and the in-flight cap (64) is saturated. Every
+  // request line past the first 64 then takes the synchronous busy branch —
+  // the exact path that, before backpressure + the async dispatch pump, would
+  // buffer unbounded outbound frames from one inbound message.
+  const herdr = await startFakeHerdr(config.herdrSocket, () => ({ id: "held", result: {} }), {
+    afterResponse: () => {},
+  });
+  t.after(() => herdr.close());
+
+  const client = await connectRawWs(port, "/herdr");
+  t.after(() => client.close());
+  assert.equal(client.statusCode, 101);
+
+  const total = 200;
+  const overflow = total - 64; // lines beyond the in-flight cap → busy errors
+  const ids = Array.from({ length: total }, (_, i) => `busy-${i}`);
+  client.sendText(ids.map((id) => JSON.stringify({ id, method: "ping", params: {} })).join("\n"));
+
+  const seen = new Set();
+  for (let i = 0; i < overflow; i++) {
+    const frame = await client.nextFrame();
+    assert.notEqual(frame.opcode, 0x8, "the busy flood must not close the connection");
+    const response = frameJson(frame);
+    assert.equal(response.error?.code, "outridr_busy");
+    seen.add(response.id);
+  }
+  assert.equal(
+    seen.size,
+    overflow,
+    "every overflow line must get its own correlated busy response",
+  );
+});
+
 test("unmasked frame — a valid but unmasked client frame closes 1002", async (t) => {
   const { server, port } = await startTestServer();
   t.after(() => server.close());

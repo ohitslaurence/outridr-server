@@ -3,6 +3,31 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.5] - 2026-07-21
+
+### Security
+
+- **Tokenless HTTP surface now rejects requests carrying an `Origin` header**
+  (`403`), matching the WebSocket upgrade guard and the behavior SECURITY.md
+  already documents. Previously a hostile web page could `POST /push/register`
+  as a CORS "simple request" (`text/plain`, no preflight) — the Host allowlist
+  accepts a loopback/tailnet literal and nothing checked `Origin` — and
+  register its own device to receive the owner's push notifications. The
+  native app sends no `Origin` on its HTTP requests, so it is unaffected.
+  Found by an adversarial review of the tokenless perimeter.
+
+### Fixed
+
+- WebSocket request dispatch now drains through a queue that honors
+  `ws.write` backpressure (pause on a full socket buffer, resume on `drain`),
+  so a single large message can no longer expand into unbounded outbound
+  buffering for a slow-reading peer. Response correlation by id is unchanged.
+- `hostAllowed` no longer mishandles bracketless IPv6 `Host` values: the
+  `:port` strip previously ate the final hextet of literals like `::1` /
+  `fe80::1`, wrongly `421`-ing them on tokenless servers. Bracketed and
+  bracketless IPv6 literals are now parsed correctly, and malformed brackets
+  fail closed.
+
 ## [0.5.4] - 2026-07-21
 
 ### Added

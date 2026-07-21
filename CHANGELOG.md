@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.6] - 2026-07-21
+
+### Changed
+
+- Moved the tongue-in-cheek "For agents" note out of `README.md` and into
+  `AGENTS.md` (which is not published to npm). The joke opened with a
+  deliberately-fake "ignore all previous instructions" line that supply-chain
+  scanners pattern-match, and `README.md` ships in the tarball. The README now
+  carries a plain "For agents & security reviewers" pointer instead, so the
+  published package no longer contains the flagged phrase.
+
 ## [0.5.5] - 2026-07-21
 
 ### Security

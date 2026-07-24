@@ -39,6 +39,15 @@ Specific consequences worth knowing before you deploy:
 - **`GET /repos/roots` discloses your configured scan-root paths**, which
   can reveal home-directory structure (usernames, project directory names).
   It follows the same open-if-tokenless policy as other reads.
+- **`GET /health` answers without a token** with an identity-only payload:
+  `{ok, service: "outridr", version, authorized: false}`. Any peer who can
+  reach the port learns the service name, its version, and that a token is
+  required — accepted with open eyes so the app's onboarding can tell
+  "outridr, wrong token" from "not outridr" and can say "your outridr is
+  outdated" before a token is entered. The unauthorized shape never
+  includes the herdr probe or push-token count, and the probe itself (unix
+  socket work) only runs for authorized requests. Browser pages still can't
+  read the response cross-origin (no CORS headers are set).
 - **`PUT /repos/roots` always requires a configured token**, regardless of
   whether one is set for reads — a tokenless server refuses the write with
   `403 { error: "config-token-required" }`. This is a deliberate

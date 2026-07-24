@@ -1,6 +1,6 @@
 {
   "name": "outridr",
-  "version": "0.5.6",
+  "version": "0.6.0",
   "description": "Ride flank on your coding agents — expose a herdr machine to your tailnet for the outridr mobile app",
   "keywords": [
     "agent-monitoring",

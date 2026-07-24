@@ -41,6 +41,7 @@ below so they aren't re-audited.
 | 021  | `outridr pair`: generate token + show QR for the app (vendored Nayuki QR encoder) | P2 | M | — | DONE (executed & reviewed 2026-07-20, merged to main; no dependency added, MIT header preserved, jsQR round-trip verified; 107 tests). App side must implement the `outridr://host:port?token=` parser. |
 | 022  | WS connection cap + idle timeout, startup rejection handling, `outridr config` token masking | P2 | M | — | DONE (executed & reviewed 2026-07-20; landed via PR under branch protection; exactly-once decrement verified, startup rejection test induced; 112 tests). Residual items from a fresh cold security re-audit whose other findings were already closed by 015/018/019. |
 | 023  | `outridr install` puts the CLI on PATH via a pinned launcher (~/.local/bin, decoupled from fnm/nvm) | P2 | S–M | — | DONE (executed & reviewed 2026-07-20; safe removal guarded by a marker; no shell rc edits; 115 tests). Bundled into the 0.5.1 release. |
+| 024  | `/health` answers pre-auth with an identity payload (`service`, `version`, `authorized`) for the app's onboarding ladder | P1 | S | — | DONE (implemented & reviewed 2026-07-24; unauthorized shape is identity-only, herdr probe stays token-gated; 126 tests; released as 0.6.0) |
 
 Also in 0.5.1 (small fixes, no separate plan): `outridr pair` now emits the app's `outridr://pair?v=1&host=…&port=…&token=…` deep-link contract and prefers the stable MagicDNS name over the raw IP (falling back to the IP). Merged via PR under branch protection.
 

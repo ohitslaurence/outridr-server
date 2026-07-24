@@ -46,7 +46,9 @@ test("GET /health — happy path", async (t) => {
   assert.equal(status, 200);
   assert.deepEqual(body, {
     ok: true,
+    service: "outridr",
     version: PACKAGE_VERSION,
+    authorized: true,
     herdr: { pong: true },
     pushTokens: 0,
   });
@@ -99,7 +101,9 @@ test("GET /health — late TCP chunk after the response line, callback still fir
   assert.equal(first.status, 200);
   assert.deepEqual(first.body, {
     ok: true,
+    service: "outridr",
     version: PACKAGE_VERSION,
+    authorized: true,
     herdr: { pong: true },
     pushTokens: 0,
   });
@@ -131,7 +135,9 @@ test("GET /health — herdr RSTs partway through a multi-chunk response, callbac
   assert.equal(first.status, 200);
   assert.deepEqual(first.body, {
     ok: true,
+    service: "outridr",
     version: PACKAGE_VERSION,
+    authorized: true,
     herdr: { pong: true },
     pushTokens: 0,
   });
@@ -144,23 +150,74 @@ test("auth — token required when configured", async (t) => {
   const { server, port } = await startTestServer({ token: "secret" });
   t.after(() => server.close());
 
-  const noToken = await getJson(`http://127.0.0.1:${port}/health`);
+  const noToken = await getJson(`http://127.0.0.1:${port}/repos/roots`);
   assert.equal(noToken.status, 401);
 
-  const bearer = await getJson(`http://127.0.0.1:${port}/health`, {
+  const bearer = await getJson(`http://127.0.0.1:${port}/repos/roots`, {
     authorization: "Bearer secret",
   });
   assert.equal(bearer.status, 200);
 
   // ?token= is scoped to the WS upgrade only (see test/websocket.test.mjs);
   // every HTTP route now accepts the Authorization header exclusively.
-  const query = await getJson(`http://127.0.0.1:${port}/health?token=secret`);
+  const query = await getJson(`http://127.0.0.1:${port}/repos/roots?token=secret`);
   assert.equal(query.status, 401);
+
+  const wrong = await getJson(`http://127.0.0.1:${port}/repos/roots`, {
+    authorization: "Bearer nope",
+  });
+  assert.equal(wrong.status, 401);
+});
+
+// /health is the one route outside the token gate (plan 024): the app's
+// onboarding needs "outridr, wrong token" to be distinguishable from "not
+// outridr at all". The unauthorized shape must stay identity-only — leaking
+// the herdr probe or push-token count here would hand pre-auth callers
+// backend state (and free unix-socket work).
+test("GET /health — identity payload without a token, full payload with", async (t) => {
+  const { server, port, config } = await startTestServer({ token: "secret" });
+  t.after(() => server.close());
+  const herdr = await startFakeHerdr(config.herdrSocket, () => ({
+    id: "outridr",
+    result: { pong: true },
+  }));
+  t.after(() => herdr.close());
+
+  const identityOnly = {
+    ok: true,
+    service: "outridr",
+    version: PACKAGE_VERSION,
+    authorized: false,
+  };
+
+  const noToken = await getJson(`http://127.0.0.1:${port}/health`);
+  assert.equal(noToken.status, 200);
+  assert.deepEqual(noToken.body, identityOnly);
 
   const wrong = await getJson(`http://127.0.0.1:${port}/health`, {
     authorization: "Bearer nope",
   });
-  assert.equal(wrong.status, 401);
+  assert.equal(wrong.status, 200);
+  assert.deepEqual(wrong.body, identityOnly);
+
+  // Query tokens are WS-upgrade-only; on /health they mean "unauthorized",
+  // not 401.
+  const query = await getJson(`http://127.0.0.1:${port}/health?token=secret`);
+  assert.equal(query.status, 200);
+  assert.deepEqual(query.body, identityOnly);
+
+  const bearer = await getJson(`http://127.0.0.1:${port}/health`, {
+    authorization: "Bearer secret",
+  });
+  assert.equal(bearer.status, 200);
+  assert.deepEqual(bearer.body, {
+    ok: true,
+    service: "outridr",
+    version: PACKAGE_VERSION,
+    authorized: true,
+    herdr: { pong: true },
+    pushTokens: 0,
+  });
 });
 
 test("request with a non-tailnet Host header — 421 misdirected request", async (t) => {

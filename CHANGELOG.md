@@ -3,6 +3,22 @@
 All notable changes to this project are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.6.0] - 2026-07-24
+
+### Changed
+
+- **`GET /health` now answers before the token gate** with an identity-only
+  payload when the request is unauthorized:
+  `{ok: true, service: "outridr", version, authorized: false}`. Authorized
+  requests get the previous payload plus the new `service` and
+  `authorized: true` fields. This lets the app's onboarding distinguish
+  "outridr is running but the token is wrong" from "that isn't an outridr
+  server", and report an outdated server before a token is entered. The
+  unauthorized shape never includes the herdr probe result or push-token
+  count, and the herdr unix-socket probe only runs for authorized requests.
+  Tradeoff documented in SECURITY.md; every other route still returns
+  `401 unauthorized`. (plan 024)
+
 ## [0.5.6] - 2026-07-21
 
 ### Changed
